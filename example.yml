@@ -3,6 +3,7 @@ modules:
     timeout: 30s
     prober: c2s
     c2s:
+      export_sasl_mechanisms: true
       fail_if_sasl_mechanism_not_offered:
       - PLAIN
       fail_if_sasl_mechanism_offered:
@@ -11,6 +12,7 @@ modules:
     timeout: 30s
     prober: c2s
     c2s:
+      export_sasl_mechanisms: true
       directtls: true
       fail_if_sasl_mechanism_not_offered:
       - PLAIN

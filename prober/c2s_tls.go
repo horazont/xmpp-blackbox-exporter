@@ -69,6 +69,14 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 	})
 	registry.MustRegister(probeFailedDueToSASLMechanism)
 
+	probeSASLMechanisms := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "probe_sasl_mechanism_offered",
+			Help: "1 if the SASL mechanism was offered",
+		},
+		[]string{"mechanism"},
+	)
+
 	host, addr, err := parseTarget(target)
 	if err != nil {
 		log.Printf("failed to parse target %s: %s", target, err)
@@ -113,6 +121,13 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 	probeSSLEarliestCertExpiry.Set(float64(getEarliestCertExpiry(tls_state.VerifiedChains).Unix()))
 
 	log.Printf("mechanisms = %s", mechanisms)
+
+	if config.C2S.ExportSASLMechanisms {
+		registry.MustRegister(probeSASLMechanisms)
+		for _, mech_available := range mechanisms {
+			probeSASLMechanisms.With(prometheus.Labels{"mechanism": mech_available}).Set(1)
+		}
+	}
 
 	if config.C2S.RequireSASLMechanisms != nil {
 		hit := false

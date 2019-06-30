@@ -45,6 +45,7 @@ type C2SProbe struct {
 	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
 	RequireSASLMechanisms []string         `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
 	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
+	ExportSASLMechanisms  bool             `yaml:"export_sasl_mechanisms,omitempty"`
 }
 
 type S2SProbe struct {
