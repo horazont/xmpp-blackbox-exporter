@@ -93,7 +93,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config) {
 
 func run() int {
 	config_file := flag.String("config.file", "", "")
-	listen_address := flag.String("web.listen-address", "localhost:9900", "")
+	listen_address := flag.String("web.listen-address", "localhost:9604", "")
 
 	flag.Parse()
 
