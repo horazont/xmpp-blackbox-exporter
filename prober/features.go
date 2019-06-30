@@ -2,10 +2,10 @@ package prober
 
 import (
 	"context"
-	"errors"
-	"encoding/xml"
-	"io"
 	"crypto/tls"
+	"encoding/xml"
+	"errors"
+	"io"
 
 	"mellium.im/sasl"
 	"mellium.im/xmlstream"

@@ -38,7 +38,7 @@ func parseTarget(target string) (string, jid.JID, error) {
 		return "", jid.JID{}, fmt.Errorf("failed to parse destination JID from %q: %s", url.Path, err)
 	}
 
-	if (addr.Localpart() == "") {
+	if addr.Localpart() == "" {
 		addr, err = addr.WithLocal("blackbox")
 		if err != nil {
 			return "", jid.JID{}, err
@@ -137,7 +137,7 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 
 	if config.C2S.RequireSASLMechanisms != nil {
 		hit := false
-outer:
+	outer:
 		for _, mech_required := range config.C2S.RequireSASLMechanisms {
 			for _, mech_available := range mechanisms {
 				if mech_available == mech_required {

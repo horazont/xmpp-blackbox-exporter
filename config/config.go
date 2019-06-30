@@ -41,16 +41,16 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 }
 
 type C2SProbe struct {
-	DirectTLS bool `yaml:"directtls,omitempty"`
-	RequireSASLMechanisms []string `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
-	ForbidSASLMechanisms []string `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
-	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
+	DirectTLS             bool             `yaml:"directtls,omitempty"`
+	RequireSASLMechanisms []string         `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
+	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
+	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
 }
 
 type Module struct {
-	Prober string `yaml:"prober,omitempty"`
+	Prober  string        `yaml:"prober,omitempty"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
-	C2S C2SProbe `yaml:"c2s,omitempty"`
+	C2S     C2SProbe      `yaml:"c2s,omitempty"`
 }
 
 type Config struct {
