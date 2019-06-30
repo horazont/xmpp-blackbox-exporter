@@ -19,13 +19,30 @@ can check for offered SASL mechanisms. Login is not supported yet.
 ```
 $ dep ensure
 $ go build cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
-$ ./xmpp_blackbox_exporter -config.file example.yml -web.listen-address localhost:9900
+$ ./xmpp_blackbox_exporter -config.file example.yml
 ```
 
-Issue an example probe (this is my service at the time of writing):
+Issue an example probe:
 
 ```
-$ curl localhost:9900/probe\?module=c2s_normal_auth\&target=xmpp://xmpp-public.sotecware.net:5222/sotecware.net
+$ curl localhost:9604/probe\?module=c2s_normal_auth\&target=xmpp:xmpp.org
+# HELP probe_duration_seconds Returns how long the probe took to complete in seconds
+# TYPE probe_duration_seconds gauge
+probe_duration_seconds 1.385793072
+# HELP probe_failed_due_to_sasl_mechanism 1 if the probe failed due to a forbidden or missing SASL mechanism
+# TYPE probe_failed_due_to_sasl_mechanism gauge
+probe_failed_due_to_sasl_mechanism 0
+# HELP probe_sasl_mechanism_offered 1 if the SASL mechanism was offered
+# TYPE probe_sasl_mechanism_offered gauge
+probe_sasl_mechanism_offered{mechanism="PLAIN"} 1
+probe_sasl_mechanism_offered{mechanism="SCRAM-SHA-1"} 1
+probe_sasl_mechanism_offered{mechanism="SCRAM-SHA-1-PLUS"} 1
+# HELP probe_ssl_earliest_cert_expiry Returns earliest SSL cert expiry date
+# TYPE probe_ssl_earliest_cert_expiry gauge
+probe_ssl_earliest_cert_expiry 1.566256987e+09
+# HELP probe_success Displays whether or not the probe was a success
+# TYPE probe_success gauge
+probe_success 1
 ```
 
 ### Target URIs
