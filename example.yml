@@ -7,3 +7,22 @@ modules:
       - PLAIN
       fail_if_sasl_mechanism_offered:
       - DIGEST-MD5
+  c2s_direct:
+    timeout: 30s
+    prober: c2s
+    c2s:
+      directtls: true
+      fail_if_sasl_mechanism_not_offered:
+      - PLAIN
+      fail_if_sasl_mechanism_offered:
+      - DIGEST-MD5
+  s2s_normal:
+    timeout: 30s
+    prober: s2s
+    s2s:
+      directtls: false
+  s2s_direct:
+    timeout: 30s
+    prober: s2s
+    s2s:
+      directtls: true

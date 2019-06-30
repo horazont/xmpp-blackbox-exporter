@@ -28,14 +28,17 @@ Issue an example probe (this is my service at the time of writing):
 $ curl localhost:9900/probe\?module=c2s_normal_auth\&target=xmpp://xmpp-public.sotecware.net:5222/sotecware.net
 ```
 
-The host part of the URL specifies the exact machine/port to connect to, to
-skip SRV resolution (not skipping resolution is currently not supported). This
-allows to probe multiple nodes of a cluster independently and
-deterministically.
+### Target URIs
+
+Supported formats:
+
+* Standard connection procedure: `xmpp:some.domain.example`. Uses normal
+  RFC 6120 / XEP-0368 (if `directtls: true`) connection procedure via SRV
+  lookups.
+* Specific connection: `xmpp://hostname:port/some.domain`. Connects to
+  `hostname` at `port` to reach `some.domain`. This skips SRV lookups and can
+  be used to probe individual nodes of an HA fallback chain or a cluster.
 
 ## Future Work
 
-- Support for S2S streams
-- Support for SRV resolution
-- Support for direct TLS (XEP-0368)
 - Support authentication and issuing IQ pings as probes

@@ -39,7 +39,7 @@ func (c *StartTLSCapture) ToStreamFeature() xmpp.StreamFeature {
 	}
 }
 
-func CheckSASLOffered(mechanisms *[]string) xmpp.StreamFeature {
+func CheckSASLOffered(offered *bool, mechanisms *[]string) xmpp.StreamFeature {
 	orig_stream_feature := xmpp.SASL("", "", sasl.Plain)
 	return xmpp.StreamFeature{
 		Name:       orig_stream_feature.Name,
@@ -49,9 +49,9 @@ func CheckSASLOffered(mechanisms *[]string) xmpp.StreamFeature {
 		},
 		Parse: orig_stream_feature.Parse,
 		Negotiate: func(ctx context.Context, session *xmpp.Session, data interface{}) (mask xmpp.SessionState, rw io.ReadWriter, err error) {
+			*offered = true
 			*mechanisms = data.([]string)
-			session.Close()
-			return 0, nil, nil
+			return xmpp.Ready, nil, nil
 		},
 	}
 }
