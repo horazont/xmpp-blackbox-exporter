@@ -1,0 +1,9 @@
+modules:
+  c2s_normal_auth:
+    timeout: 30s
+    prober: c2s
+    c2s:
+      fail_if_sasl_mechanism_not_offered:
+      - PLAIN
+      fail_if_sasl_mechanism_offered:
+      - DIGEST-MD5
