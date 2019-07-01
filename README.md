@@ -17,9 +17,9 @@ See also the [example configuration](example.yml).
 ## Build & Usage
 
 ```
-$ dep ensure
-$ go build cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
-$ ./xmpp_blackbox_exporter -config.file example.yml
+$ export GO111MODULE=on
+$ go build .
+$ ./prometheus-xmpp-blackbox-exporter -config.file example.yml
 ```
 
 Issue an example probe:
