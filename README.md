@@ -7,12 +7,12 @@ Prometheus.
 Like the official [blackbox_exporter](https://github.com/prometheus/blackbox_exporter),
 it operates "from a distance", executing blackbox probes against the service.
 
-## Configuration
+## [Configuration](CONFIGURATION.md)
 
-The configuration is very similar to the blackbox exporter. Please refer to
-there for the style. Currently, there is only one prober implemented (`c2s`)
-which establishes a C2S connection with TLS and exports TLS information and
-can check for offered SASL mechanisms. Login is not supported yet.
+The configuration is very similar to the blackbox exporter. The full reference
+is available in [CONFIGURATION.md](CONFIGURATION.md).
+
+See also the [example configuration](example.yml).
 
 ## Build & Usage
 
