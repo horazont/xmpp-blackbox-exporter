@@ -28,3 +28,10 @@ modules:
     prober: s2s
     s2s:
       directtls: true
+  ping:
+    timeout: 30s
+    prober: ping
+    ping:
+      client_address: blackbox@domain.example
+      client_password: sup3rs3cur3p4ssw0rd
+      directtls: false

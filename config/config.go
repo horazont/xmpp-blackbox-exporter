@@ -55,11 +55,25 @@ type S2SProbe struct {
 	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
 }
 
+type PingResult struct {
+	Success        bool   `yaml:"success",omitempty"`
+	ErrorType      string `yaml:"error_type,omitempty"`
+	ErrorCondition string `yaml:"error_condition,omitempty"`
+}
+
+type PingProbe struct {
+	DirectTLS       bool             `yaml:"directtls,omitempty"`
+	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
+	Address         string           `yaml:"client_address,omitempty"`
+	Password        string           `yaml:"client_password,omitempty"`
+}
+
 type Module struct {
 	Prober  string        `yaml:"prober,omitempty"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 	C2S     C2SProbe      `yaml:"c2s,omitempty"`
 	S2S     S2SProbe      `yaml:"s2s,omitempty"`
+	Ping    PingProbe     `yaml:"ping,omitempty"`
 }
 
 type Config struct {
@@ -78,5 +92,15 @@ func (s *Module) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 func (s *C2SProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain C2SProbe
+	return unmarshal((*plain)(s))
+}
+
+func (s *S2SProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type plain S2SProbe
+	return unmarshal((*plain)(s))
+}
+
+func (s *PingProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type plain PingProbe
 	return unmarshal((*plain)(s))
 }

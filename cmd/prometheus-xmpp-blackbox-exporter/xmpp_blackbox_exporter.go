@@ -25,8 +25,9 @@ var (
 	}
 
 	Probers = map[string]prober.ProbeFn{
-		"c2s": prober.ProbeC2S,
-		"s2s": prober.ProbeS2S,
+		"c2s":  prober.ProbeC2S,
+		"s2s":  prober.ProbeS2S,
+		"ping": prober.ProbePing,
 	}
 )
 

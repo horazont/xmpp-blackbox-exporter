@@ -21,7 +21,6 @@ type connTrace struct {
 	start        time.Time
 	connectDone  time.Time
 	starttlsDone time.Time
-	preauth      time.Time
 	authDone     time.Time
 }
 

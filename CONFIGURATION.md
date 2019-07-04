@@ -32,7 +32,7 @@ modules:
 ### <module>
 
 ```yml
-    # The prober to use. One of c2s, s2s.
+    # The prober to use. One of c2s, s2s, ping.
     prober: <prober_string>
 
     # How long to probe before giving up
@@ -41,6 +41,7 @@ modules:
     # Exactly the one matching the prober string given above must be defined
     [ c2s: <c2s_probe> ]
     [ s2s: <s2s_probe> ]
+    [ ping: <ping_probe> ]
 ```
 
 ### <c2s_probe>
@@ -83,6 +84,24 @@ modules:
 
 ```
 
+### <ping_probe>
+
+```yml
+    # If true, _xmpps-server SRV records will be used instead of _xmpp-server
+    # SRV records and direct TLS will be used instead of STARTTLS
+    [ directtls: <boolean> ]
+
+    # Configure how TLS is established. Used for both direct TLS and STARTTLS.
+    [ tls_config: <tls_config> ]
+
+    # The credentials to connect with for sending the ping. At this time, only
+    # password authentication is supported.
+    client_address: <string>
+    client_password: <string>
+
+```
+
+A ping probe requires a normal JID (no URI) as target.
 
 ### <tls_config>
 
