@@ -9,6 +9,14 @@ Prometheus.
 Like the official [blackbox_exporter](https://github.com/prometheus/blackbox_exporter),
 it operates "from a distance", executing blackbox probes against the service.
 
+## Features
+
+- Test c2s and s2s connectivity for standard RFC 6120 hosts and hosts supporting
+  [XEP-0368](https://xmpp.org/extensions/xep-0368.html).
+- Test for specific SASL mechanisms
+- Send IQ pings and test for specific error conditions or success
+- For c2s and s2s tests, connect to specific hosts, circumventing SRV lookup
+
 ## [Configuration](CONFIGURATION.md)
 
 The configuration is very similar to the blackbox exporter. The full reference
@@ -59,7 +67,7 @@ probe_success 1
 
 ### Target URIs
 
-Supported formats:
+For c2s and s2s probes, the following target URI formats are supported:
 
 * Standard connection procedure: `xmpp:some.domain.example`. Uses normal
   RFC 6120 / XEP-0368 (if `directtls: true`) connection procedure via SRV
@@ -68,6 +76,6 @@ Supported formats:
   `hostname` at `port` to reach `some.domain`. This skips SRV lookups and can
   be used to probe individual nodes of an HA fallback chain or a cluster.
 
-## Future Work
-
-- Support authentication and issuing IQ pings as probes
+Ping propes only support a normal JID (not wrapped in an `xmpp:` URI) as
+input. That is the JID which will be pinged from the account configured in the
+configuration.
