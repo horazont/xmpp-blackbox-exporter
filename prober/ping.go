@@ -92,8 +92,6 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 			xmpp.StreamConfig{
 				Lang:     "en",
 				Features: features,
-				TeeOut:   teeLogger{prefix: "OUT:"},
-				TeeIn:    teeLogger{prefix: "IN :"},
 			},
 		),
 	)
@@ -159,7 +157,6 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 	}
 
 	for _, permitted := range permittedResults {
-		log.Printf("%s match %s", permitted, result)
 		if permitted.Matches(result) {
 			return true
 		}
