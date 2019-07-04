@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"time"
 
 	"mellium.im/sasl"
 	"mellium.im/xmlstream"
@@ -54,4 +55,14 @@ func CheckSASLOffered(offered *bool, mechanisms *[]string) xmpp.StreamFeature {
 			return xmpp.Ready, nil, nil
 		},
 	}
+}
+
+func traceStreamFeature(f xmpp.StreamFeature, t *time.Time) (result xmpp.StreamFeature) {
+	result = f
+	result.Negotiate = func(ctx context.Context, session *xmpp.Session, data interface{}) (mask xmpp.SessionState, rw io.ReadWriter, err error) {
+		mask, rw, err = f.Negotiate(ctx, session, data)
+		*t = time.Now()
+		return
+	}
+	return
 }

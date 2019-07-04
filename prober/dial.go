@@ -7,12 +7,23 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	pconfig "github.com/prometheus/common/config"
 
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"
 )
+
+type connTrace struct {
+	starttls     bool
+	auth         bool
+	start        time.Time
+	connectDone  time.Time
+	starttlsDone time.Time
+	preauth      time.Time
+	authDone     time.Time
+}
 
 func dial(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, addr jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
 	if host == "" {

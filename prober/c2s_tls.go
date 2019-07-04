@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"log"
 	"net"
+	"time"
 
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"
@@ -14,13 +15,13 @@ import (
 	"github.com/horazont/prometheus-xmpp-blackbox-exporter/config"
 )
 
-func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config) (tls_state *tls.ConnectionState, mechanisms []string, err error) {
+func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, mechanisms []string, err error) {
 	capture := NewCapturingStartTLS(tls_config)
 	sasl_offered := false
 
 	features := make([]xmpp.StreamFeature, 0)
 	if tls_config != nil {
-		features = append(features, capture.ToStreamFeature())
+		features = append(features, traceStreamFeature(capture.ToStreamFeature(), &ct.starttlsDone))
 	}
 	features = append(features, CheckSASLOffered(&sasl_offered, &mechanisms))
 
@@ -67,6 +68,13 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		Name: "probe_failed_due_to_sasl_mechanism",
 		Help: "1 if the probe failed due to a forbidden or missing SASL mechanism",
 	})
+
+	durationGaugeVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "probe_xmpp_duration_seconds",
+		Help: "Duration of xmpp connection by phase",
+	}, []string{"phase"})
+
+	registry.MustRegister(durationGaugeVec)
 	registry.MustRegister(probeFailedDueToSASLMechanism)
 
 	probeSASLMechanisms := prometheus.NewGaugeVec(
@@ -83,6 +91,11 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
+	ct := connTrace{}
+	ct.auth = false
+	ct.starttls = !config.C2S.DirectTLS
+	ct.start = time.Now()
+
 	tls_config, err := newTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
@@ -95,6 +108,9 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
+	ct.connectDone = time.Now()
+	durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
+
 	var tls_state_from_probe *tls.ConnectionState
 	var mechanisms []string
 	{
@@ -102,8 +118,13 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		if config.C2S.DirectTLS {
 			tls_config_to_pass = nil
 		}
-		tls_state_from_probe, mechanisms, err = executeProbeC2S(ctx, conn, addr, tls_config_to_pass)
+		tls_state_from_probe, mechanisms, err = executeProbeC2S(ctx, conn, addr, tls_config_to_pass, &ct)
 	}
+
+	if !ct.starttls {
+		ct.starttlsDone = ct.connectDone
+	}
+	durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
 
 	var tls_state tls.ConnectionState
 	if tls_state_from_dial != nil {
