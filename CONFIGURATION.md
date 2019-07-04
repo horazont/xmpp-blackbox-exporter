@@ -99,9 +99,27 @@ modules:
     client_address: <string>
     client_password: <string>
 
+    # Explicitly specify which results are allowed; if omitted, it defaults to
+    # the successful result.
+    fail_if_not:
+      [ - <ping_result> ]
+
 ```
 
 A ping probe requires a normal JID (no URI) as target.
+
+#### <ping_result>
+
+```yml
+    # Match successful pings
+    [ success: <bool> ]
+
+    # Match on the error condition for non-successful pings
+    [ error_condition: <string> ]
+
+    # Match on the error type for non-successful pings
+    [ error_type: <string> ]
+```
 
 ### <tls_config>
 

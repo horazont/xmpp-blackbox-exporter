@@ -66,6 +66,21 @@ type PingProbe struct {
 	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
 	Address         string           `yaml:"client_address,omitempty"`
 	Password        string           `yaml:"client_password,omitempty"`
+	PingTimeout     time.Duration    `yaml:"ping_timeout,omitempty"`
+	ExpectedResults []PingResult     `yaml:"fail_if_not,omitempty"`
+}
+
+func (r PingResult) Matches(other PingResult) bool {
+	if (r.Success) {
+		return other.Success
+	}
+	if (r.ErrorType != "" && r.ErrorType != other.ErrorType) {
+		return false
+	}
+	if (r.ErrorCondition != "" && r.ErrorCondition != other.ErrorCondition) {
+		return false
+	}
+	return true
 }
 
 type Module struct {

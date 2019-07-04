@@ -35,3 +35,9 @@ modules:
       client_address: blackbox@domain.example
       client_password: sup3rs3cur3p4ssw0rd
       directtls: false
+      # treat as success if either a proper ping response is seen or a
+      # `remote-server-not-found` error condition is returned.
+      # rarely a good combination, this is just for illustration purposes :)
+      fail_if_not:
+      - success: true
+      - error_condition: remote-server-not-found

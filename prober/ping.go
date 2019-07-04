@@ -26,7 +26,7 @@ func (l teeLogger) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func ProbePing(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
+func ProbePing(ctx context.Context, target string, cfg config.Module, registry *prometheus.Registry) bool {
 	durationGaugeVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "probe_xmpp_duration_seconds",
 		Help: "Duration of xmpp connection by phase",
@@ -39,9 +39,9 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 	})
 	registry.MustRegister(pingTimeoutGauge)
 
-	client_addr, err := jid.Parse(config.Ping.Address)
+	client_addr, err := jid.Parse(cfg.Ping.Address)
 	if err != nil {
-		log.Printf("invalid client JID %q: %s", config.Ping.Address, err)
+		log.Printf("invalid client JID %q: %s", cfg.Ping.Address, err)
 		return false
 	}
 
@@ -51,18 +51,18 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 		return false
 	}
 
-	tls_config, err := newTLSConfig(&config.Ping.TLSConfig, client_addr.Domainpart())
+	tls_cfg, err := newTLSConfig(&cfg.Ping.TLSConfig, client_addr.Domainpart())
 	if err != nil {
-		log.Printf("invalid tls config: %s", err)
+		log.Printf("invalid tls cfg: %s", err)
 		return false
 	}
 
 	ct := connTrace{}
 	ct.auth = true
-	ct.starttls = !config.Ping.DirectTLS
+	ct.starttls = !cfg.Ping.DirectTLS
 	ct.start = time.Now()
 
-	_, conn, err := dial(ctx, config.Ping.DirectTLS, tls_config, "", client_addr, false)
+	_, conn, err := dial(ctx, cfg.Ping.DirectTLS, tls_cfg, "", client_addr, false)
 	if err != nil {
 		log.Printf("failed to connect to domain %s: %s", client_addr.Domainpart(), err)
 		return false
@@ -73,13 +73,13 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 	features := []xmpp.StreamFeature{
 		xmpp.SASL(
 			client_addr.Localpart(),
-			config.Ping.Password,
+			cfg.Ping.Password,
 			sasl.ScramSha256Plus, sasl.ScramSha1Plus, sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
 		),
 		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
 	}
-	if !config.Ping.DirectTLS {
-		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, tls_config), &ct.starttlsDone)}, features...)
+	if !cfg.Ping.DirectTLS {
+		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, tls_cfg), &ct.starttlsDone)}, features...)
 	}
 
 	session, err := xmpp.NegotiateSession(
@@ -92,6 +92,8 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 			xmpp.StreamConfig{
 				Lang:     "en",
 				Features: features,
+				TeeOut:   teeLogger{prefix: "OUT:"},
+				TeeIn:    teeLogger{prefix: "IN :"},
 			},
 		),
 	)
@@ -116,7 +118,7 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 		Type: stanza.GetIQ,
 	}
 
-	_, err = session.Send(ctx, stanza.WrapIQ(
+	response_stream, err := session.Send(ctx, stanza.WrapIQ(
 		&iq,
 		xmlstream.Wrap(
 			nil,
@@ -130,5 +132,38 @@ func ProbePing(ctx context.Context, target string, config config.Module, registr
 		return false
 	}
 
-	return true
+	response := struct {
+		stanza.IQ
+		Error stanza.Error `xml:"jabber:client error"`
+		Ping struct{} `xml:"urn:xmpp:ping ping"`
+	}{}
+	d := xml.NewTokenDecoder(response_stream)
+	start_token, err := d.Token()
+	start := start_token.(xml.StartElement)
+	d.DecodeElement(&response, &start)
+
+	var result config.PingResult
+	if response.Type == stanza.ResultIQ {
+		result.Success = true
+	} else if response.Type == stanza.ErrorIQ {
+		result.ErrorType = string(response.Error.Type)
+		result.ErrorCondition = string(response.Error.Condition)
+	} else {
+		log.Printf("failed to parse: %s", err)
+		return false
+	}
+
+	permittedResults := cfg.Ping.ExpectedResults
+	if permittedResults == nil {
+		permittedResults = []config.PingResult{config.PingResult{Success: true}}
+	}
+
+	for _, permitted := range permittedResults {
+		log.Printf("%s match %s", permitted, result)
+		if permitted.Matches(result) {
+			return true
+		}
+	}
+
+	return false
 }
