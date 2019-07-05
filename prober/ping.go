@@ -43,7 +43,6 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		Name: "probe_xmpp_ping_duration_seconds",
 		Help: "Ping round-trip time",
 	})
-	registry.MustRegister(pingRTTGauge)
 
 	client_addr, err := jid.Parse(cfg.Ping.Address)
 	if err != nil {
@@ -135,6 +134,7 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 
 	tpong := time.Now()
 
+	registry.MustRegister(pingRTTGauge)
 	pingRTTGauge.Set(tpong.Sub(tping).Seconds())
 
 	if err != nil {
