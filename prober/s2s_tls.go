@@ -78,6 +78,7 @@ func ProbeS2S(ctx context.Context, target string, config config.Module, registry
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false
 	}
+	defer conn.Close()
 
 	var tls_state_from_probe *tls.ConnectionState
 	{

@@ -67,6 +67,7 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		log.Printf("failed to connect to domain %s: %s", client_addr.Domainpart(), err)
 		return false
 	}
+	defer conn.Close()
 
 	ct.connectDone = time.Now()
 

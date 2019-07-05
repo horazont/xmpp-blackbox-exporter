@@ -107,6 +107,7 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false
 	}
+	defer conn.Close()
 
 	ct.connectDone = time.Now()
 	durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
