@@ -39,6 +39,12 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 	})
 	registry.MustRegister(pingTimeoutGauge)
 
+	pingRTTGauge := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "probe_xmpp_ping_duration_seconds",
+		Help: "Ping round-trip time",
+	})
+	registry.MustRegister(pingRTTGauge)
+
 	client_addr, err := jid.Parse(cfg.Ping.Address)
 	if err != nil {
 		log.Printf("invalid client JID %q: %s", cfg.Ping.Address, err)
@@ -112,6 +118,8 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 
 	go session.Serve(nil)
 
+	tping := time.Now()
+
 	iq := stanza.IQ{
 		To:   target_addr,
 		Type: stanza.GetIQ,
@@ -124,6 +132,10 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 			xml.StartElement{Name: xml.Name{Local: "ping", Space: "urn:xmpp:ping"}},
 		),
 	))
+
+	tpong := time.Now()
+
+	pingRTTGauge.Set(tpong.Sub(tping).Seconds())
 
 	if err != nil {
 		log.Printf("failed to send stanza: %s", err)
