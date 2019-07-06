@@ -71,13 +71,13 @@ type PingProbe struct {
 }
 
 func (r PingResult) Matches(other PingResult) bool {
-	if (r.Success) {
+	if r.Success {
 		return other.Success
 	}
-	if (r.ErrorType != "" && r.ErrorType != other.ErrorType) {
+	if r.ErrorType != "" && r.ErrorType != other.ErrorType {
 		return false
 	}
-	if (r.ErrorCondition != "" && r.ErrorCondition != other.ErrorCondition) {
+	if r.ErrorCondition != "" && r.ErrorCondition != other.ErrorCondition {
 		return false
 	}
 	return true

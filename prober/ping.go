@@ -146,7 +146,7 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 	response := struct {
 		stanza.IQ
 		Error stanza.Error `xml:"jabber:client error"`
-		Ping struct{} `xml:"urn:xmpp:ping ping"`
+		Ping  struct{}     `xml:"urn:xmpp:ping ping"`
 	}{}
 	d := xml.NewTokenDecoder(response_stream)
 	start_token, err := d.Token()
