@@ -9,6 +9,7 @@ require (
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
+	github.com/stretchr/testify v1.3.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/image v0.0.0-20190622003408-7e034cad6442 // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
