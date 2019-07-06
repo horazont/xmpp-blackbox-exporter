@@ -17,6 +17,18 @@ it operates "from a distance", executing blackbox probes against the service.
 - Send IQ pings and test for specific error conditions or success
 - For c2s and s2s tests, connect to specific hosts, circumventing SRV lookup
 
+### Standard support
+
+- [RFC 6120](https://tools.ietf.org/html/rfc6120) – basic XMPP client
+- [XEP-0199](https://xmpp.org/extensions/xep-0199.html) v2.0.1 – XMPP in-band ping
+- [XEP-0368](https://xmpp.org/extensions/xep-0368.html) v1.0.0 – XMPP over TLS (without STARTTLS)
+
+  Note: Support for mixing `xmpps-client` and `xmpp-client` records is
+  currently not implemented; use of `xmpps-client` records needs to be
+  requested explicitly via `directtls: true` in the configuration of the
+  respective prober and will override use of `xmpp-client` records. The same
+  applies to `xmpps-server`.
+
 ## [Configuration](CONFIGURATION.md)
 
 The configuration is very similar to the blackbox exporter. The full reference
