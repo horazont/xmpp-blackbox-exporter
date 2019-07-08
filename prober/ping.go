@@ -131,6 +131,7 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 			xml.StartElement{Name: xml.Name{Local: "ping", Space: "urn:xmpp:ping"}},
 		),
 	))
+	defer response_stream.Close()
 
 	tpong := time.Now()
 
