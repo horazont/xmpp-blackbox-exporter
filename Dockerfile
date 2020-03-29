@@ -1,8 +1,9 @@
-FROM golang:1.12 as builder
+FROM golang:1.13 as builder
 WORKDIR /go/src/app
 COPY . .
 ENV GO111MODULE on
-RUN go build cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
+RUN go mod vendor
+RUN go build -trimpath ./cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
 
 FROM gcr.io/distroless/base
 COPY --from=builder /go/src/app/xmpp_blackbox_exporter /xmpp_blackbox_exporter
