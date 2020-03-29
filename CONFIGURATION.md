@@ -75,6 +75,10 @@ modules:
 ### <s2s_probe>
 
 ```yml
+    # The address from which the S2S stream will appear to originate.
+    # Must be a domain-only bare JID.
+    from: <string>
+
     # If true, _xmpps-server SRV records will be used instead of _xmpp-server
     # SRV records and direct TLS will be used instead of STARTTLS
     [ directtls: <boolean> ]

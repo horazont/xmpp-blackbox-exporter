@@ -59,6 +59,7 @@ type S2SProbe struct {
 	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
 	RequireSASLMechanisms []string         `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
 	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
+	From                  string           `yaml:"from"`
 }
 
 type PingResult struct {
@@ -131,6 +132,19 @@ func (p *C2SProbe) Validate() error {
 }
 
 func (p *S2SProbe) Validate() error {
+	if p.From == "" {
+		return fmt.Errorf("`from` is required")
+	}
+	jid, err := jid.Parse(p.From)
+	if err != nil {
+		return fmt.Errorf("invalid address (%s): %q", err.Error(), p.From)
+	}
+	if jid.Localpart() != "" {
+		return fmt.Errorf("invalid address (Localpart must be empty for S2S checks): %q", p.From)
+	}
+	if jid.Resourcepart() != "" {
+		return fmt.Errorf("invalid address (Resource must be empty for S2S checks): %q", p.From)
+	}
 	return nil
 }
 

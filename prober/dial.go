@@ -24,7 +24,7 @@ type connTrace struct {
 	authDone     time.Time
 }
 
-func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, addr jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
 	if host == "" {
 		dialer := dial.Dialer{
 			NoTLS:     !directTLS,
@@ -32,7 +32,7 @@ func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host 
 			TLSConfig: tls_config,
 		}
 		dialer.Deadline, _ = ctx.Deadline()
-		conn, err = dialer.Dial(ctx, "tcp", addr)
+		conn, err = dialer.Dial(ctx, "tcp", to)
 	} else {
 		dialer := net.Dialer{}
 		dialer.Deadline, _ = ctx.Deadline()
@@ -51,14 +51,14 @@ func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host 
 	return
 }
 
-func parseTarget(target string) (string, jid.JID, error) {
+func parseTarget(target string, s2s bool) (string, jid.JID, error) {
 	url, err := url.Parse(target)
 	if err != nil {
 		return "", jid.JID{}, err
 	}
 
 	if url.Scheme != "xmpp" {
-		return "", jid.JID{}, fmt.Errorf("invalid URL scheme for C2S probe: %s", url.Scheme)
+		return "", jid.JID{}, fmt.Errorf("invalid URL scheme for probe: %s", url.Scheme)
 	}
 
 	var (
@@ -78,7 +78,9 @@ func parseTarget(target string) (string, jid.JID, error) {
 		return "", jid.JID{}, fmt.Errorf("failed to parse destination JID from %q: %s", url.Path, err)
 	}
 
-	if addr.Localpart() == "" {
+	if s2s && addr.Localpart() != "" {
+		return "", jid.JID{}, fmt.Errorf("S2S probes do not support a localpart")
+	} else if !s2s && addr.Localpart() == "" {
 		addr, err = addr.WithLocal("blackbox")
 		if err != nil {
 			return "", jid.JID{}, err

@@ -85,7 +85,7 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		[]string{"mechanism"},
 	)
 
-	host, addr, err := parseTarget(target)
+	host, addr, err := parseTarget(target, false)
 	if err != nil {
 		log.Printf("failed to parse target %s: %s", target, err)
 		return false

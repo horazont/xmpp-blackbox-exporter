@@ -23,11 +23,13 @@ modules:
     prober: s2s
     s2s:
       directtls: false
+      from: "domain.example"
   s2s_direct:
     timeout: 30s
     prober: s2s
     s2s:
       directtls: true
+      from: "domain.example"
   ping:
     timeout: 30s
     prober: ping

@@ -14,7 +14,7 @@ import (
 	"github.com/horazont/prometheus-xmpp-blackbox-exporter/config"
 )
 
-func executeProbeS2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config) (tls_state *tls.ConnectionState, err error) {
+func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JID, tls_config *tls.Config) (tls_state *tls.ConnectionState, err error) {
 	capture := NewCapturingStartTLS(tls_config)
 
 	features := make([]xmpp.StreamFeature, 0)
@@ -24,14 +24,15 @@ func executeProbeS2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 
 	session, err := xmpp.NegotiateSession(
 		ctx,
-		addr.Domain(),
-		addr,
+		to.Domain(),
+		from,
 		conn,
 		false,
 		xmpp.NewNegotiator(
 			xmpp.StreamConfig{
 				Lang:     "en",
 				Features: features,
+				S2S:      true,
 			},
 		),
 	)
@@ -61,19 +62,23 @@ func ProbeS2S(ctx context.Context, target string, config config.Module, registry
 		Help: "Returns earliest SSL cert expiry date",
 	})
 
-	host, addr, err := parseTarget(target)
+	host, to, err := parseTarget(target, true)
 	if err != nil {
 		log.Printf("failed to parse target %s: %s", target, err)
 		return false
 	}
 
-	tls_config, err := newTLSConfig(&config.S2S.TLSConfig, addr.Domainpart())
+	// ignoring error here, the address has already been validated by the
+	// config reloader
+	from, _ := jid.Parse(config.S2S.From)
+
+	tls_config, err := newTLSConfig(&config.S2S.TLSConfig, to.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
 		return false
 	}
 
-	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, addr, true)
+	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, to, true)
 	if err != nil {
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false
@@ -86,7 +91,7 @@ func ProbeS2S(ctx context.Context, target string, config config.Module, registry
 		if config.S2S.DirectTLS {
 			tls_config_to_pass = nil
 		}
-		tls_state_from_probe, err = executeProbeS2S(ctx, conn, addr, tls_config_to_pass)
+		tls_state_from_probe, err = executeProbeS2S(ctx, conn, from, to, tls_config_to_pass)
 	}
 
 	var tls_state tls.ConnectionState
