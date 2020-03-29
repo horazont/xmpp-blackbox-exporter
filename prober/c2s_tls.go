@@ -15,15 +15,14 @@ import (
 	"github.com/horazont/prometheus-xmpp-blackbox-exporter/config"
 )
 
-func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, mechanisms []string, err error) {
+func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, info StreamInfo, err error) {
 	capture := NewCapturingStartTLS(tls_config)
-	sasl_offered := false
 
 	features := make([]xmpp.StreamFeature, 0)
 	if tls_config != nil {
 		features = append(features, traceStreamFeature(capture.ToStreamFeature(), &ct.starttlsDone))
 	}
-	features = append(features, CheckSASLOffered(&sasl_offered, &mechanisms))
+	features = append(features, CheckSASLOffered(&info.SASLOffered, &info.SASLMechanisms))
 
 	session, err := xmpp.NegotiateSession(
 		ctx,
@@ -41,21 +40,23 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	defer session.Close()
 
 	if err != nil {
-		return tls_state, mechanisms, err
+		return tls_state, info, err
 	}
+
+	info.Negotiated = true
 
 	if tls_config != nil {
 		tls_conn := capture.CapturedWriter.(*tls.Conn)
 		err = tls_conn.Handshake()
 		if err != nil {
-			return tls_state, mechanisms, err
+			return tls_state, info, err
 		}
 
 		tls_state = &tls.ConnectionState{}
 		*tls_state = tls_conn.ConnectionState()
 	}
 
-	return tls_state, mechanisms, nil
+	return tls_state, info, nil
 }
 
 func ProbeC2S(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
@@ -91,16 +92,16 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
-	ct := connTrace{}
-	ct.auth = false
-	ct.starttls = !config.C2S.DirectTLS
-	ct.start = time.Now()
-
 	tls_config, err := newTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
 		return false
 	}
+
+	ct := connTrace{}
+	ct.auth = false
+	ct.starttls = !config.C2S.DirectTLS
+	ct.start = time.Now()
 
 	tls_state_from_dial, conn, err := dialXMPP(ctx, config.C2S.DirectTLS, tls_config, host, addr, false)
 	if err != nil {
@@ -113,13 +114,13 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 	durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
 
 	var tls_state_from_probe *tls.ConnectionState
-	var mechanisms []string
+	var stream_info StreamInfo
 	{
 		tls_config_to_pass := tls_config
 		if config.C2S.DirectTLS {
 			tls_config_to_pass = nil
 		}
-		tls_state_from_probe, mechanisms, err = executeProbeC2S(ctx, conn, addr, tls_config_to_pass, &ct)
+		tls_state_from_probe, stream_info, err = executeProbeC2S(ctx, conn, addr, tls_config_to_pass, &ct)
 	}
 
 	if !ct.starttls {
@@ -142,42 +143,21 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 	registry.MustRegister(probeSSLEarliestCertExpiry)
 	probeSSLEarliestCertExpiry.Set(float64(getEarliestCertExpiry(tls_state.VerifiedChains).Unix()))
 
-	log.Printf("mechanisms = %s", mechanisms)
-
 	if config.C2S.ExportSASLMechanisms {
 		registry.MustRegister(probeSASLMechanisms)
-		for _, mech_available := range mechanisms {
+		for _, mech_available := range stream_info.SASLMechanisms {
 			probeSASLMechanisms.With(prometheus.Labels{"mechanism": mech_available}).Set(1)
 		}
 	}
 
-	if config.C2S.RequireSASLMechanisms != nil {
-		hit := false
-	outer:
-		for _, mech_required := range config.C2S.RequireSASLMechanisms {
-			for _, mech_available := range mechanisms {
-				if mech_available == mech_required {
-					hit = true
-					break outer
-				}
-			}
-		}
-		if !hit {
-			probeFailedDueToSASLMechanism.Set(1)
-			return false
-		}
+	sasl_ok := ValidateSASLMechanisms(
+		stream_info.SASLMechanisms,
+		config.C2S.ForbidSASLMechanisms,
+		config.C2S.RequireSASLMechanisms,
+	)
+	if !sasl_ok {
+		probeFailedDueToSASLMechanism.Set(1)
 	}
 
-	if config.C2S.ForbidSASLMechanisms != nil {
-		for _, mech_forbidden := range config.C2S.ForbidSASLMechanisms {
-			for _, mech_available := range mechanisms {
-				if mech_available == mech_forbidden {
-					probeFailedDueToSASLMechanism.Set(1)
-					return false
-				}
-			}
-		}
-	}
-
-	return true
+	return sasl_ok
 }

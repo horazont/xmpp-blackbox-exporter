@@ -13,6 +13,13 @@ import (
 	"mellium.im/xmpp"
 )
 
+type StreamInfo struct {
+	Negotiated      bool
+	SASLOffered     bool
+	SASLMechanisms  []string
+	DialbackOffered bool
+}
+
 type StartTLSCapture struct {
 	cfg            *tls.Config
 	CapturedWriter io.ReadWriter
@@ -65,4 +72,41 @@ func traceStreamFeature(f xmpp.StreamFeature, t *time.Time) (result xmpp.StreamF
 		return
 	}
 	return
+}
+
+func isAnyContainedIn(needles []string, haystack []string) bool {
+	for _, needle := range(needles) {
+		for _, hay := range(haystack) {
+			if needle == hay {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isAllContainedIn(needles []string, haystack []string) bool {
+	for _, needle := range(needles) {
+		found := false
+		for _, hay := range(haystack) {
+			if needle == hay {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func ValidateSASLMechanisms(mechanisms []string, forbidden []string, required []string) bool {
+	if forbidden != nil && isAnyContainedIn(forbidden, mechanisms) {
+		return false
+	}
+	if required != nil && !isAllContainedIn(required, mechanisms) {
+		return false
+	}
+	return true
 }
