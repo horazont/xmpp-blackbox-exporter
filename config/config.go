@@ -9,6 +9,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/prometheus/common/config"
+
+	"mellium.im/xmpp/jid"
 )
 
 type SafeConfig struct {
@@ -31,6 +33,10 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 
 	if err = decoder.Decode(c); err != nil {
 		return fmt.Errorf("error parsing config file: %s", err)
+	}
+
+	if err = c.Validate(); err != nil {
+		return fmt.Errorf("error validating config file: %s", err)
 	}
 
 	sc.Lock()
@@ -118,4 +124,41 @@ func (s *S2SProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 func (s *PingProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain PingProbe
 	return unmarshal((*plain)(s))
+}
+
+func (p *C2SProbe) Validate() error {
+	return nil
+}
+
+func (p *S2SProbe) Validate() error {
+	return nil
+}
+
+func (p *PingProbe) Validate() error {
+	if _, err := jid.Parse(p.Address); err != nil {
+		return fmt.Errorf("invalid address (%s): %q", err.Error(), p.Address)
+	}
+	return nil
+}
+
+func (m *Module) Validate() error {
+	switch m.Prober {
+	case "c2s":
+		return m.C2S.Validate()
+	case "s2s":
+		return m.S2S.Validate()
+	case "ping":
+		return m.Ping.Validate()
+	default:
+		return fmt.Errorf("invalid prober: %s", m.Prober)
+	}
+}
+
+func (c *Config) Validate() error {
+	for name, mod := range c.Modules {
+		if err := mod.Validate(); err != nil {
+			return fmt.Errorf("failed to validate module %q: %s", name, err.Error())
+		}
+	}
+	return nil
 }
