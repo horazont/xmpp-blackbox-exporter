@@ -21,6 +21,12 @@ func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JI
 	if tls_config != nil {
 		features = append(features, capture.ToStreamFeature())
 	}
+	var mechanisms []string
+	var sasl_offered bool
+	features = append(
+		features,
+		CheckSASLOffered(&sasl_offered, &mechanisms),
+	)
 
 	session, err := xmpp.NegotiateSession(
 		ctx,
