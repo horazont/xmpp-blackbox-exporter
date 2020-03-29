@@ -32,7 +32,7 @@ modules:
 ### <module>
 
 ```yml
-    # The prober to use. One of c2s, s2s, ping.
+    # The prober to use. One of c2s, s2s, ping, ibr.
     prober: <prober_string>
 
     # How long to probe before giving up
