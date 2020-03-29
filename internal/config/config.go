@@ -93,12 +93,19 @@ func (r PingResult) Matches(other PingResult) bool {
 	return true
 }
 
+type IBRProbe struct {
+	Prefix    string           `yaml:"prefix,omitempty"`
+	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
+	DirectTLS bool             `yaml:"directtls,omitempty"`
+}
+
 type Module struct {
 	Prober  string        `yaml:"prober,omitempty"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 	C2S     C2SProbe      `yaml:"c2s,omitempty"`
 	S2S     S2SProbe      `yaml:"s2s,omitempty"`
 	Ping    PingProbe     `yaml:"ping,omitempty"`
+	IBR     IBRProbe      `yaml:"ibr,omitempty"`
 }
 
 type Config struct {
@@ -163,6 +170,13 @@ func (p *PingProbe) Validate() error {
 	return nil
 }
 
+func (p *IBRProbe) Validate() error {
+	if p.Prefix == "" {
+		return fmt.Errorf("prefix must not be empty")
+	}
+	return nil
+}
+
 func (m *Module) Validate() error {
 	switch m.Prober {
 	case "c2s":
@@ -171,6 +185,8 @@ func (m *Module) Validate() error {
 		return m.S2S.Validate()
 	case "ping":
 		return m.Ping.Validate()
+	case "ibr":
+		return m.IBR.Validate()
 	default:
 		return fmt.Errorf("invalid prober: %s", m.Prober)
 	}

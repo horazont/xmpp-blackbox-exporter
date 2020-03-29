@@ -43,3 +43,9 @@ modules:
       fail_if_not:
       - success: true
       - error_condition: remote-server-not-found
+  register:
+   timeout: 30s
+   prober: ibr
+   ibr:
+     prefix: "blackbox-probe-"
+     directtls: false

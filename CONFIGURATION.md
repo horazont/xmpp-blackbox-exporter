@@ -42,6 +42,7 @@ modules:
     [ c2s: <c2s_probe> ]
     [ s2s: <s2s_probe> ]
     [ ping: <ping_probe> ]
+    [ ibr: <ibr_probe> ]
 ```
 
 ### <c2s_probe>
@@ -158,6 +159,25 @@ A ping probe requires a normal JID (no URI) as target.
 
     # Match on the error type for non-successful pings
     [ error_type: <string> ]
+```
+
+### <ibr_probe>
+
+Register an account at the target XMPP service, log into the new account and
+delete it.
+
+```yml
+    # If true, _xmpps-client SRV records will be used instead of _xmpp-client
+    # SRV records and direct TLS will be used instead of STARTTLS
+    [ directtls: <boolean> ]
+
+    # Configure how TLS is established. Used for both direct TLS and STARTTLS.
+    [ tls_config: <tls_config> ]
+
+    # Constant prefix to attach to the account names. Strongly recommended to
+    # be able to clean up debris in case something goes wrong.
+    [ prefix: <string> ]
+
 ```
 
 ### <tls_config>

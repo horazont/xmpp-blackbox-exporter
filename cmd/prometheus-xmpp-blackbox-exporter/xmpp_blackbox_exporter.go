@@ -28,6 +28,7 @@ var (
 		"c2s":  prober.ProbeC2S,
 		"s2s":  prober.ProbeS2S,
 		"ping": prober.ProbePing,
+		"ibr":  prober.ProbeIBR,
 	}
 )
 

@@ -20,6 +20,10 @@ it operates "from a distance", executing blackbox probes against the service.
 ### Standard support
 
 - [RFC 6120](https://tools.ietf.org/html/rfc6120) – basic XMPP client
+- [XEP-0077](https://xmpp.org/extensions/xep-0077.html) v2.4 – IBR prober
+
+  Note: Supports only non-Dataform-based registration.
+
 - [XEP-0199](https://xmpp.org/extensions/xep-0199.html) v2.0.1 – XMPP in-band ping
 - [XEP-0368](https://xmpp.org/extensions/xep-0368.html) v1.0.0 – XMPP over TLS (without STARTTLS)
 
@@ -79,7 +83,7 @@ probe_success 1
 
 ### Target URIs
 
-For c2s and s2s probes, the following target URI formats are supported:
+For c2s, s2s and IBR probes, the following target URI formats are supported:
 
 * Standard connection procedure: `xmpp:some.domain.example`. Uses normal
   RFC 6120 / XEP-0368 (if `directtls: true`) connection procedure via SRV
