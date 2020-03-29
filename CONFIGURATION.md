@@ -46,6 +46,9 @@ modules:
 
 ### <c2s_probe>
 
+Connect to the client-to-server port of the target XMPP service, negotiate TLS
+and check offered SASL mechanisms.
+
 ```yml
     # If true, _xmpps-client SRV records will be used instead of _xmpp-client
     # SRV records and direct TLS will be used instead of STARTTLS
@@ -73,6 +76,9 @@ modules:
 ```
 
 ### <s2s_probe>
+
+Connect to the server-to-server port of the target XMPP service, negotiate TLS
+and check offered SASL mechanisms as well as dialback.
 
 ```yml
     # The address from which the S2S stream will appear to originate.
@@ -116,8 +122,11 @@ modules:
 
 ### <ping_probe>
 
+Log into a provisioned XMPP account and send an XMPP Ping (XEP-0199) to the
+target entity of the probe.
+
 ```yml
-    # If true, _xmpps-server SRV records will be used instead of _xmpp-server
+    # If true, _xmpps-client SRV records will be used instead of _xmpp-client
     # SRV records and direct TLS will be used instead of STARTTLS
     [ directtls: <boolean> ]
 
