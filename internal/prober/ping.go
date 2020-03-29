@@ -168,7 +168,11 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 	d := xml.NewTokenDecoder(response_stream)
 	start_token, err := d.Token()
 	start := start_token.(xml.StartElement)
-	d.DecodeElement(&response, &start)
+	err = d.DecodeElement(&response, &start)
+	if err != nil {
+		log.Printf("failed to parse: %s", err)
+		return false
+	}
 
 	var result config.PingResult
 	if response.Type == stanza.ResultIQ {
