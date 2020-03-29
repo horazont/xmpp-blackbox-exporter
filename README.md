@@ -16,6 +16,7 @@ it operates "from a distance", executing blackbox probes against the service.
 - Test for specific SASL mechanisms
 - Send IQ pings and test for specific error conditions or success
 - For c2s and s2s tests, connect to specific hosts, circumventing SRV lookup
+- Test In-Band registration
 
 ### Standard support
 
