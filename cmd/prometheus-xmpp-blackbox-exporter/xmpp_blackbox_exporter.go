@@ -15,8 +15,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/config"
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/prober"
+	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/config"
+	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/prober"
 )
 
 var (

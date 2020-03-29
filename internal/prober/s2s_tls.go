@@ -3,6 +3,7 @@ package prober
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -12,37 +13,41 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/config"
+	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/config"
 )
 
-func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, info StreamInfo, err error) {
+func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, info StreamInfo, err error) {
 	capture := NewCapturingStartTLS(tls_config)
 
 	features := make([]xmpp.StreamFeature, 0)
 	if tls_config != nil {
 		features = append(features, traceStreamFeature(capture.ToStreamFeature(), &ct.starttlsDone))
 	}
-	features = append(features, CheckSASLOffered(&info.SASLOffered, &info.SASLMechanisms))
+	features = append(
+		features,
+		CheckSASLOffered(&info.SASLOffered, &info.SASLMechanisms),
+		CheckDialbackOffered(&info.DialbackOffered),
+	)
 
 	session, err := xmpp.NegotiateSession(
 		ctx,
-		addr.Domain(),
-		addr,
+		to.Domain(),
+		from,
 		conn,
 		false,
 		xmpp.NewNegotiator(
 			xmpp.StreamConfig{
 				Lang:     "en",
 				Features: features,
+				S2S:      true,
 			},
 		),
 	)
 	defer session.Close()
 
 	if err != nil {
-		return tls_state, info, err
+		return tls_state, info, fmt.Errorf("failed to negotiate session: %s", err.Error())
 	}
-
 	info.Negotiated = true
 
 	if tls_config != nil {
@@ -59,7 +64,7 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	return tls_state, info, nil
 }
 
-func ProbeC2S(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
+func ProbeS2S(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
 	probeSSLEarliestCertExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "probe_ssl_earliest_cert_expiry",
 		Help: "Returns earliest SSL cert expiry date",
@@ -70,6 +75,11 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		Help: "1 if the probe failed due to a forbidden or missing SASL mechanism",
 	})
 
+	probeFailedDueToDialback := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "probe_failed_due_to_dialback",
+		Help: "1 if the probe failed due to the offering of dialback",
+	})
+
 	durationGaugeVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "probe_xmpp_duration_seconds",
 		Help: "Duration of xmpp connection by phase",
@@ -77,6 +87,7 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 
 	registry.MustRegister(durationGaugeVec)
 	registry.MustRegister(probeFailedDueToSASLMechanism)
+	registry.MustRegister(probeFailedDueToDialback)
 
 	probeSASLMechanisms := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -86,13 +97,24 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		[]string{"mechanism"},
 	)
 
-	host, addr, err := parseTarget(target, false)
+	probeDialbackOffered := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "probe_dialback_offered",
+			Help: "1 if dialback was offered",
+		},
+	)
+
+	host, to, err := parseTarget(target, true)
 	if err != nil {
 		log.Printf("failed to parse target %s: %s", target, err)
 		return false
 	}
 
-	tls_config, err := newTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
+	// ignoring error here, the address has already been validated by the
+	// config reloader
+	from, _ := jid.Parse(config.S2S.From)
+
+	tls_config, err := newTLSConfig(&config.S2S.TLSConfig, to.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
 		return false
@@ -100,10 +122,10 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 
 	ct := connTrace{}
 	ct.auth = false
-	ct.starttls = !config.C2S.DirectTLS
+	ct.starttls = !config.S2S.DirectTLS
 	ct.start = time.Now()
 
-	tls_state_from_dial, conn, err := dialXMPP(ctx, config.C2S.DirectTLS, tls_config, host, addr, false)
+	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, to, true)
 	if err != nil {
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false
@@ -117,10 +139,10 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 	var stream_info StreamInfo
 	{
 		tls_config_to_pass := tls_config
-		if config.C2S.DirectTLS {
+		if config.S2S.DirectTLS {
 			tls_config_to_pass = nil
 		}
-		tls_state_from_probe, stream_info, err = executeProbeC2S(ctx, conn, addr, tls_config_to_pass, &ct)
+		tls_state_from_probe, stream_info, err = executeProbeS2S(ctx, conn, from, to, tls_config_to_pass, &ct)
 	}
 
 	if !ct.starttls {
@@ -140,24 +162,38 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
+	_ = stream_info
+
 	registry.MustRegister(probeSSLEarliestCertExpiry)
 	probeSSLEarliestCertExpiry.Set(float64(getEarliestCertExpiry(tls_state.VerifiedChains).Unix()))
 
-	if config.C2S.ExportSASLMechanisms {
+	if config.S2S.ExportAuthMechanisms {
 		registry.MustRegister(probeSASLMechanisms)
+		registry.MustRegister(probeDialbackOffered)
 		for _, mech_available := range stream_info.SASLMechanisms {
 			probeSASLMechanisms.With(prometheus.Labels{"mechanism": mech_available}).Set(1)
+		}
+		if stream_info.DialbackOffered {
+			probeDialbackOffered.Set(1)
+		} else {
+			probeDialbackOffered.Set(0)
 		}
 	}
 
 	sasl_ok := ValidateSASLMechanisms(
 		stream_info.SASLMechanisms,
-		config.C2S.ForbidSASLMechanisms,
-		config.C2S.RequireSASLMechanisms,
+		config.S2S.ForbidSASLMechanisms,
+		config.S2S.RequireSASLMechanisms,
 	)
 	if !sasl_ok {
 		probeFailedDueToSASLMechanism.Set(1)
 	}
 
-	return sasl_ok
+	dialback_failed := (config.S2S.RequireDialback && !stream_info.DialbackOffered ||
+		config.S2S.ForbidDialback && stream_info.DialbackOffered)
+	if dialback_failed {
+		probeFailedDueToDialback.Set(1)
+	}
+
+	return sasl_ok && !dialback_failed
 }
