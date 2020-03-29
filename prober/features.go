@@ -55,10 +55,37 @@ func CheckSASLOffered(offered *bool, mechanisms *[]string) xmpp.StreamFeature {
 		List: func(ctx context.Context, e xmlstream.TokenWriter, start xml.StartElement) (req bool, err error) {
 			return false, errors.New("sending features not supported")
 		},
-		Parse: orig_stream_feature.Parse,
-		Negotiate: func(ctx context.Context, session *xmpp.Session, data interface{}) (mask xmpp.SessionState, rw io.ReadWriter, err error) {
+		Parse: func(ctx context.Context, r xml.TokenReader, start *xml.StartElement) (req bool, data interface{}, err error) {
+			req, data, err = orig_stream_feature.Parse(ctx, r, start)
 			*offered = true
 			*mechanisms = data.([]string)
+			return req, data, err
+		},
+		Negotiate: func(ctx context.Context, session *xmpp.Session, data interface{}) (mask xmpp.SessionState, rw io.ReadWriter, err error) {
+			return xmpp.Ready, nil, nil
+		},
+	}
+}
+
+func CheckDialbackOffered(offered *bool) xmpp.StreamFeature {
+	return xmpp.StreamFeature{
+		Name: xml.Name{
+			Space: "urn:xmpp:features:dialback",
+			Local: "dialback",
+		},
+		Prohibited: xmpp.Authn,
+		List: func(ctx context.Context, e xmlstream.TokenWriter, start xml.StartElement) (req bool, err error) {
+			return false, errors.New("sending features not supported")
+		},
+		Parse: func(ctx context.Context, r xml.TokenReader, start *xml.StartElement) (req bool, data interface{}, err error) {
+			*offered = true
+			parsed := struct {
+				XMLName xml.Name `xml:"urn:xmpp:features:dialback dialback"`
+			}{}
+			err = xml.NewTokenDecoder(r).DecodeElement(&parsed, start)
+			return false, nil, err
+		},
+		Negotiate: func(ctx context.Context, session *xmpp.Session, data interface{}) (mask xmpp.SessionState, rw io.ReadWriter, err error) {
 			return xmpp.Ready, nil, nil
 		},
 	}
@@ -75,8 +102,8 @@ func traceStreamFeature(f xmpp.StreamFeature, t *time.Time) (result xmpp.StreamF
 }
 
 func isAnyContainedIn(needles []string, haystack []string) bool {
-	for _, needle := range(needles) {
-		for _, hay := range(haystack) {
+	for _, needle := range needles {
+		for _, hay := range haystack {
 			if needle == hay {
 				return true
 			}
@@ -86,9 +113,9 @@ func isAnyContainedIn(needles []string, haystack []string) bool {
 }
 
 func isAllContainedIn(needles []string, haystack []string) bool {
-	for _, needle := range(needles) {
+	for _, needle := range needles {
 		found := false
-		for _, hay := range(haystack) {
+		for _, hay := range haystack {
 			if needle == hay {
 				found = true
 				break

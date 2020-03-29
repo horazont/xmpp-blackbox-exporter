@@ -86,6 +86,32 @@ modules:
     # Configure how TLS is established. Used for both direct TLS and STARTTLS.
     [ tls_config: <tls_config> ]
 
+    # If given, the named SASL mechanisms must be present in the stream
+    # features after TLS, otherwise the probe fails.
+    fail_if_sasl_mechanism_not_offered:
+      [ - <string> ]
+
+    # If given, the named SASL mechanisms must NOT be present in the stream
+    # features after TLS, otherwise the probe fails.
+    fail_if_sasl_mechanism_offered:
+      [ - <string> ]
+
+    # If true, the probe will be considered unsuccessful if dialback is
+    # offered.
+    [ fail_if_dialback_offered: <boolean> ]
+
+    # If true, the probe will be considered unsuccessful if dialback is
+    # NOT offered.
+    [ fail_if_dialback_not_offered: <boolean> ]
+
+    # If true, a metric vector which names all SASL mechanisms offered by the
+    # service is exported. Note that this allows the probed service to cause
+    # metric churn on your Prometheus, so you might want to enable this with
+    # care.
+    # In addition, a Gauge indicating the presence of the dialback feature is
+    # exported.
+    [ export_auth_mechanisms: <boolean> ]
+
 ```
 
 ### <ping_probe>

@@ -59,6 +59,9 @@ type S2SProbe struct {
 	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
 	RequireSASLMechanisms []string         `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
 	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
+	RequireDialback       bool             `yaml:"fail_if_dialback_not_offered,omitempty"`
+	ForbidDialback        bool             `yaml:"fail_if_dialback_offered,omitempty"`
+	ExportAuthMechanisms  bool             `yaml:"export_auth_mechanisms,omitempty"`
 	From                  string           `yaml:"from"`
 }
 
@@ -145,6 +148,11 @@ func (p *S2SProbe) Validate() error {
 	if jid.Resourcepart() != "" {
 		return fmt.Errorf("invalid address (Resource must be empty for S2S checks): %q", p.From)
 	}
+
+	if p.RequireDialback && p.ForbidDialback {
+		return fmt.Errorf("cannot both require and forbid dialback")
+	}
+
 	return nil
 }
 
