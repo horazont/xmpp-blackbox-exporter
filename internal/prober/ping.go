@@ -2,8 +2,10 @@ package prober
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/xml"
 	"log"
+	"net"
 	"time"
 
 	"mellium.im/sasl"
@@ -24,6 +26,56 @@ type teeLogger struct {
 func (l teeLogger) Write(p []byte) (n int, err error) {
 	log.Printf("%s %s", l.prefix, p)
 	return len(p), nil
+}
+
+func login(ctx context.Context, tlsConfig *tls.Config, clientAddr jid.JID, password string, directTLS bool) (ct connTrace, conn net.Conn, session *xmpp.Session, err error) {
+	ct.auth = true
+	ct.starttls = !directTLS
+	ct.start = time.Now()
+
+	_, conn, err = dialXMPP(ctx, directTLS, tlsConfig, "", clientAddr, false)
+	if err != nil {
+		log.Printf("failed to connect to domain %s: %s", clientAddr.Domainpart(), err)
+		return ct, nil, nil, err
+	}
+
+	ct.connectDone = time.Now()
+
+	features := []xmpp.StreamFeature{
+		xmpp.SASL(
+			clientAddr.Localpart(),
+			password,
+			sasl.ScramSha256Plus, sasl.ScramSha1Plus, sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
+		),
+		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
+	}
+	if !directTLS {
+		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, tlsConfig), &ct.starttlsDone)}, features...)
+	}
+
+	session, err = xmpp.NegotiateSession(
+		ctx,
+		clientAddr.Domain(),
+		clientAddr,
+		conn,
+		false,
+		xmpp.NewNegotiator(
+			xmpp.StreamConfig{
+				Lang:     "en",
+				Features: features,
+			},
+		),
+	)
+	if err != nil {
+		conn.Close()
+		return ct, nil, nil, err
+	}
+
+	if !ct.starttls {
+		ct.starttlsDone = ct.connectDone
+	}
+
+	return ct, conn, session, err
 }
 
 func ProbePing(ctx context.Context, target string, cfg config.Module, registry *prometheus.Registry) bool {
@@ -62,54 +114,19 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		return false
 	}
 
-	ct := connTrace{}
-	ct.auth = true
-	ct.starttls = !cfg.Ping.DirectTLS
-	ct.start = time.Now()
-
-	_, conn, err := dialXMPP(ctx, cfg.Ping.DirectTLS, tls_cfg, "", client_addr, false)
-	if err != nil {
-		log.Printf("failed to connect to domain %s: %s", client_addr.Domainpart(), err)
-		return false
-	}
-	defer conn.Close()
-
-	ct.connectDone = time.Now()
-
-	features := []xmpp.StreamFeature{
-		xmpp.SASL(
-			client_addr.Localpart(),
-			cfg.Ping.Password,
-			sasl.ScramSha256Plus, sasl.ScramSha1Plus, sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
-		),
-		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
-	}
-	if !cfg.Ping.DirectTLS {
-		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, tls_cfg), &ct.starttlsDone)}, features...)
-	}
-
-	session, err := xmpp.NegotiateSession(
+	ct, conn, session, err := login(
 		ctx,
-		client_addr.Domain(),
+		tls_cfg,
 		client_addr,
-		conn,
-		false,
-		xmpp.NewNegotiator(
-			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
-			},
-		),
+		cfg.Ping.Password,
+		cfg.Ping.DirectTLS,
 	)
 	if err != nil {
 		log.Printf("failed to establish session for %s: %s", client_addr, err)
 		return false
 	}
+	defer conn.Close()
 	defer session.Close()
-
-	if !ct.starttls {
-		ct.starttlsDone = ct.connectDone
-	}
 
 	durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
 	durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
