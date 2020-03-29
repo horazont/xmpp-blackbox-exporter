@@ -11,7 +11,7 @@ import (
 
 	pconfig "github.com/prometheus/common/config"
 
-	"mellium.im/xmpp"
+	"mellium.im/xmpp/dial"
 	"mellium.im/xmpp/jid"
 )
 
@@ -24,9 +24,9 @@ type connTrace struct {
 	authDone     time.Time
 }
 
-func dial(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, addr jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, addr jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
 	if host == "" {
-		dialer := xmpp.Dialer{
+		dialer := dial.Dialer{
 			NoTLS:     !directTLS,
 			S2S:       s2s,
 			TLSConfig: tls_config,

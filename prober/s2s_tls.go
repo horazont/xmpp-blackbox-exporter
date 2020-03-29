@@ -73,7 +73,7 @@ func ProbeS2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
-	tls_state_from_dial, conn, err := dial(ctx, config.S2S.DirectTLS, tls_config, host, addr, true)
+	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, addr, true)
 	if err != nil {
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false

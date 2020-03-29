@@ -67,7 +67,7 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 	ct.starttls = !cfg.Ping.DirectTLS
 	ct.start = time.Now()
 
-	_, conn, err := dial(ctx, cfg.Ping.DirectTLS, tls_cfg, "", client_addr, false)
+	_, conn, err := dialXMPP(ctx, cfg.Ping.DirectTLS, tls_cfg, "", client_addr, false)
 	if err != nil {
 		log.Printf("failed to connect to domain %s: %s", client_addr.Domainpart(), err)
 		return false
@@ -124,13 +124,10 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		Type: stanza.GetIQ,
 	}
 
-	response_stream, err := session.Send(ctx, stanza.WrapIQ(
-		&iq,
-		xmlstream.Wrap(
-			nil,
-			xml.StartElement{Name: xml.Name{Local: "ping", Space: "urn:xmpp:ping"}},
-		),
-	))
+	response_stream, err := session.SendIQElement(ctx, xmlstream.Wrap(
+		nil,
+		xml.StartElement{Name: xml.Name{Local: "ping", Space: "urn:xmpp:ping"}},
+	), iq)
 	if response_stream != nil {
 		defer response_stream.Close()
 	}
