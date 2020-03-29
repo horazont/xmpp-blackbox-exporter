@@ -56,7 +56,7 @@ type S2SProbe struct {
 }
 
 type PingResult struct {
-	Success        bool   `yaml:"success",omitempty"`
+	Success        bool   `yaml:"success,omitempty"`
 	ErrorType      string `yaml:"error_type,omitempty"`
 	ErrorCondition string `yaml:"error_condition,omitempty"`
 }

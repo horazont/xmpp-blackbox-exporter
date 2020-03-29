@@ -21,3 +21,5 @@ require (
 	mellium.im/xmlstream v0.13.2
 	mellium.im/xmpp v0.11.1
 )
+
+go 1.13

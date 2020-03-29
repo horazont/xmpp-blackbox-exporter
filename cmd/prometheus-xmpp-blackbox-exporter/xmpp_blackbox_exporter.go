@@ -157,8 +157,6 @@ func run() int {
 			return 1
 		}
 	}
-
-	return 0
 }
 
 func main() {
