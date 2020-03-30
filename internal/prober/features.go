@@ -104,35 +104,6 @@ type RegisterQuery struct {
 	Email        string   `xml:"jabber:iq:register email"`
 }
 
-func (r *RegisterQuery) TokenReader() xml.TokenReader {
-	return xmlstream.Wrap(
-		xmlstream.MultiReader(
-			xmlstream.Wrap(
-				xmlstream.Token(xml.CharData(r.Username)),
-				xml.StartElement{Name: xml.Name{
-					Local: "username",
-				}},
-			),
-			xmlstream.Wrap(
-				xmlstream.Token(xml.CharData(r.Password)),
-				xml.StartElement{Name: xml.Name{
-					Local: "password",
-				}},
-			),
-			xmlstream.Wrap(
-				xmlstream.Token(xml.CharData(r.Email)),
-				xml.StartElement{Name: xml.Name{
-					Local: "email",
-				}},
-			),
-		),
-		xml.StartElement{Name: xml.Name{
-			Space: "jabber:iq:register",
-			Local: "query",
-		}},
-	)
-}
-
 func randomAccountName(prefix string) (string, error) {
 	buf := make([]byte, 6)
 	_, err := rand.Read(buf)
@@ -185,16 +156,18 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 				return xmpp.SessionState(0), nil, err
 			}
 
-			err = session.Send(
-				ctx,
-				stanza.IQ{
+			err = session.Encode(struct {
+				stanza.IQ
+				Query RegisterQuery
+			}{
+				IQ: stanza.IQ{
 					Type: stanza.SetIQ,
-				}.Wrap((&RegisterQuery{
+				},
+				Query: RegisterQuery{
 					Username: username,
 					Password: *password,
-				}).TokenReader()),
-			)
-
+				},
+			})
 			if err != nil {
 				return xmpp.SessionState(0), nil, fmt.Errorf("registration failed: %s", err.Error())
 			}
