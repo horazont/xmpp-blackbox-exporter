@@ -215,6 +215,12 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 				return xmpp.SessionState(0), nil, fmt.Errorf("failed to parse response: %s", err.Error())
 			}
 
+			if response.Type == stanza.ErrorIQ {
+				tmp := &stanza.Error{}
+				*tmp = response.Error
+				return xmpp.SessionState(0), nil, tmp
+			}
+
 			return xmpp.Ready, nil, nil
 		},
 	}
