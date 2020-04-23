@@ -178,6 +178,15 @@ delete it.
     # be able to clean up debris in case something goes wrong.
     [ prefix: <string> ]
 
+    # If an error occurs during registration and this is set to true, a
+    # constant metric with `type` and `condition` labels matching the
+    # respective properties of the XMPP error which was returned will be
+    # exported.
+    #
+    # Note that when using this with untrusted servers, they may be able to
+    # cause a high cardinality in these labels, so enable with care.
+    [ export_error_info: <boolean> ]
+
 ```
 
 ### <tls_config>

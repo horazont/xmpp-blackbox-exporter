@@ -49,3 +49,4 @@ modules:
    ibr:
      prefix: "blackbox-probe-"
      directtls: false
+     export_error_info: true
