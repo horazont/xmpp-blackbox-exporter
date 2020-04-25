@@ -175,7 +175,6 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, registry
 		ct.starttlsDone = ct.connectDone
 	}
 	c.durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
-	c.durationGaugeVec.WithLabelValues("register").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
 
 	if err != nil {
 		log.Printf("registration failed: %s", err.Error())
@@ -191,6 +190,8 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, registry
 
 		return false
 	}
+
+	c.durationGaugeVec.WithLabelValues("register").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
 
 	ct, conn, session, err := login(
 		c.ctx,
