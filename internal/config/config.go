@@ -94,9 +94,10 @@ func (r PingResult) Matches(other PingResult) bool {
 }
 
 type IBRProbe struct {
-	Prefix    string           `yaml:"prefix,omitempty"`
-	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
-	DirectTLS bool             `yaml:"directtls,omitempty"`
+	Prefix          string           `yaml:"prefix,omitempty"`
+	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
+	DirectTLS       bool             `yaml:"directtls,omitempty"`
+	ExportErrorInfo bool             `yaml:"export_error_info,omitempty"`
 }
 
 type Module struct {

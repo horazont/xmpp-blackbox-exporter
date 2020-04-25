@@ -184,10 +184,15 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 			if err != nil {
 				return xmpp.SessionState(0), nil, err
 			}
+			iqId, err := randomPassword()
+			if err != nil {
+				return xmpp.SessionState(0), nil, err
+			}
 
 			err = session.Send(
 				ctx,
 				stanza.IQ{
+					ID: iqId,
 					Type: stanza.SetIQ,
 				}.Wrap((&RegisterQuery{
 					Username: username,
@@ -213,6 +218,12 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 			err = d.DecodeElement(&response, &start)
 			if err != nil {
 				return xmpp.SessionState(0), nil, fmt.Errorf("failed to parse response: %s", err.Error())
+			}
+
+			if response.Type == stanza.ErrorIQ {
+				tmp := &stanza.Error{}
+				*tmp = response.Error
+				return xmpp.SessionState(0), nil, tmp
 			}
 
 			return xmpp.Ready, nil, nil

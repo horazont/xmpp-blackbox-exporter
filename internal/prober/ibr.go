@@ -34,6 +34,7 @@ type ibrCheckContext struct {
 	tlsConfig   *tls.Config
 
 	durationGaugeVec *prometheus.GaugeVec
+	errorGaugeVec    *prometheus.GaugeVec
 }
 
 func (c *ibrCheckContext) executeRegistration(conn net.Conn, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, err error) {
@@ -139,6 +140,10 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, registry
 			Name: "probe_xmpp_duration_seconds",
 			Help: "Duration of xmpp connection by phase",
 		}, []string{"phase"}),
+		errorGaugeVec: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "probe_xmpp_ibr_error",
+			Help: "The last error encountered, if any",
+		}, []string{"type", "condition"}),
 	}
 
 	registry.MustRegister(c.durationGaugeVec)
@@ -170,12 +175,23 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, registry
 		ct.starttlsDone = ct.connectDone
 	}
 	c.durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
-	c.durationGaugeVec.WithLabelValues("register").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
 
 	if err != nil {
 		log.Printf("registration failed: %s", err.Error())
+
+		stanzaError, ok := err.(*stanza.Error)
+		if ok && config.IBR.ExportErrorInfo {
+			registry.MustRegister(c.errorGaugeVec)
+			c.errorGaugeVec.WithLabelValues(
+				string(stanzaError.Type),
+				string(stanzaError.Condition),
+			).Set(1)
+		}
+
 		return false
 	}
+
+	c.durationGaugeVec.WithLabelValues("register").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
 
 	ct, conn, session, err := login(
 		c.ctx,
