@@ -10,6 +10,6 @@ fmt:
 	go fmt ./...
 
 build:
-	go build ./cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
+	go build -trimpath ./cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
 
 .PHONY: lint test fmt build all
