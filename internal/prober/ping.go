@@ -45,7 +45,7 @@ func login(ctx context.Context, tlsConfig *tls.Config, clientAddr jid.JID, passw
 		xmpp.SASL(
 			clientAddr.Localpart(),
 			password,
-			sasl.ScramSha256Plus, sasl.ScramSha1Plus, sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
+			sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
 		),
 		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
 	}
