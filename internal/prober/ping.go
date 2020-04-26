@@ -16,7 +16,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/config"
+	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
 )
 
 type teeLogger struct {

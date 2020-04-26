@@ -16,7 +16,7 @@ import (
 	"mellium.im/xmpp/jid"
 	"mellium.im/xmpp/stanza"
 
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/config"
+	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
 )
 
 type AccountInfo struct {

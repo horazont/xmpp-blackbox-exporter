@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/horazont/prometheus-xmpp-blackbox-exporter/internal/config"
+	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
 )
 
 func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, info StreamInfo, err error) {
