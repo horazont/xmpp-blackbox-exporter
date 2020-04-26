@@ -3,7 +3,7 @@ WORKDIR /go/src/app
 COPY . .
 ENV GO111MODULE on
 RUN go mod vendor
-RUN go build -trimpath ./cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
+RUN go build -trimpath ./cmd/xmpp_blackbox_exporter/xmpp_blackbox_exporter.go
 
 FROM gcr.io/distroless/base
 COPY --from=builder /go/src/app/xmpp_blackbox_exporter /xmpp_blackbox_exporter
