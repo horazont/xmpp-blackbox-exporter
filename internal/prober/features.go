@@ -192,7 +192,7 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 			err = session.Send(
 				ctx,
 				stanza.IQ{
-					ID: iqId,
+					ID:   iqId,
 					Type: stanza.SetIQ,
 				}.Wrap((&RegisterQuery{
 					Username: username,
