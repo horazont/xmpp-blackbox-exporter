@@ -1,4 +1,4 @@
-# Prometheus XMPP Blackbox Exporter
+# XMPP Blackbox Exporter
 
 [![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/xsfjonas/prometheus-xmpp-blackbox-exporter.svg)](https://hub.docker.com/r/xsfjonas/prometheus-xmpp-blackbox-exporter)
 
