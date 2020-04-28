@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/xml"
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -82,24 +81,6 @@ func (c *ibrCheckContext) executeRegistration(conn net.Conn, tls_config *tls.Con
 	return tls_state, nil
 }
 
-func (c *ibrCheckContext) loginAndDeregister(ct *connTrace) error {
-	ct_tmp, conn, session, err := login(
-		c.ctx,
-		c.tlsConfig,
-		c.accountInfo.Account,
-		c.accountInfo.Password,
-		c.config.DirectTLS,
-	)
-	*ct = ct_tmp
-	if err != nil {
-		return fmt.Errorf("failed to establish session for %s: %s", c.accountInfo.Account, err)
-	}
-	defer conn.Close()
-	defer session.Close()
-
-	return nil
-}
-
 func cancelRegistrationTokenReader() xml.TokenReader {
 	return xmlstream.Wrap(
 		xmlstream.MultiReader(
@@ -117,14 +98,14 @@ func cancelRegistrationTokenReader() xml.TokenReader {
 	)
 }
 
-func ProbeIBR(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
+func ProbeIBR(ctx context.Context, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
 	host, addr, err := parseTarget(target, false)
 	if err != nil {
 		log.Printf("failed to parse target %s: %s", target, err)
 		return false
 	}
 
-	tls_config, err := newTLSConfig(&config.IBR.TLSConfig, addr.Domainpart())
+	tls_config, err := NewTLSConfig(&config.IBR.TLSConfig, addr.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
 		return false
@@ -193,13 +174,13 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, registry
 
 	c.durationGaugeVec.WithLabelValues("register").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
 
-	ct, conn, session, err := login(
-		c.ctx,
-		c.tlsConfig,
-		c.accountInfo.Account,
-		c.accountInfo.Password,
-		c.config.DirectTLS,
-	)
+	clientCfg := ClientConfig{
+		TLS:           c.tlsConfig,
+		ClientAddress: c.accountInfo.Account,
+		Password:      c.accountInfo.Password,
+		DirectTLS:     c.config.DirectTLS,
+	}
+	ct, conn, session, err := clientCfg.Login(c.ctx)
 	if err != nil {
 		log.Printf("failed to establish session for %s: %s", c.accountInfo.Account, err)
 	}

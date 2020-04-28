@@ -9,8 +9,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
+
+	"mellium.im/xmpp/jid"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -19,10 +22,66 @@ import (
 	"github.com/horazont/xmpp-blackbox-exporter/internal/prober"
 )
 
-var (
-	sc = &config.SafeConfig{
-		C: &config.Config{},
+type RuntimeState struct {
+	sync.RWMutex
+
+	C       *config.Config
+	Clients prober.Clients
+}
+
+func NewRuntimeState() *RuntimeState {
+	return &RuntimeState{
+		sync.RWMutex{},
+		&config.Config{},
+		make(map[string]*prober.Client),
 	}
+}
+
+func (st *RuntimeState) ReloadConfig(path string) error {
+	cfg, err := config.LoadConfig(path)
+	if err != nil {
+		return err
+	}
+
+	newClients := make(map[string]*prober.Client)
+	for name, accountCfg := range cfg.Accounts {
+		clientAddress := jid.MustParse(accountCfg.Address)
+		tlsConfig, err := prober.NewTLSConfig(
+			&accountCfg.TLSConfig,
+			clientAddress.Domainpart(),
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to configure TLS for account %q: %s",
+				name,
+				err,
+			)
+		}
+
+		newClients[name] = prober.NewClient(
+			&prober.ClientConfig{
+				TLS:           tlsConfig,
+				ClientAddress: clientAddress,
+				Password:      accountCfg.Password,
+				DirectTLS:     accountCfg.DirectTLS,
+			},
+		)
+	}
+
+	st.Lock()
+	defer st.Unlock()
+
+	for _, client := range st.Clients {
+		client.Close()
+	}
+	st.C = cfg
+	st.Clients = newClients
+
+	return nil
+}
+
+var (
+	sc = NewRuntimeState()
 
 	Probers = map[string]prober.ProbeFn{
 		"c2s":  prober.ProbeC2S,
@@ -32,7 +91,7 @@ var (
 	}
 )
 
-func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config) {
+func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config, clients prober.Clients) {
 	moduleName := r.URL.Query().Get("module")
 	module, ok := conf.Modules[moduleName]
 	if !ok {
@@ -78,7 +137,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config) {
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
 
-	success := prober(ctx, target, module, registry)
+	success := prober(ctx, target, module, clients, registry)
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
 
@@ -130,10 +189,18 @@ func run() int {
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/probe", func(w http.ResponseWriter, r *http.Request) {
-		sc.Lock()
+		sc.RLock()
 		conf := sc.C
-		sc.Unlock()
-		probeHandler(w, r, conf)
+		clients := sc.Clients
+		sc.RUnlock()
+		// worst that should be able to happen for us running this outside of
+		// the lock is that a client is already disconnected when the prober
+		// runs during a reload
+		//
+		// I think this is tolerable. If you think it is not, please file an
+		// issue and we’ll pull the probeHandler into the RLock()/Unlock()
+		// block
+		probeHandler(w, r, conf, clients)
 	})
 
 	srv := http.Server{Addr: *listen_address}

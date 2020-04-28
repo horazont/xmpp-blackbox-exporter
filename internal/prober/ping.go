@@ -2,13 +2,11 @@ package prober
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/xml"
 	"log"
 	"net"
 	"time"
 
-	"mellium.im/sasl"
 	"mellium.im/xmlstream"
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"
@@ -28,62 +26,11 @@ func (l teeLogger) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func login(ctx context.Context, tlsConfig *tls.Config, clientAddr jid.JID, password string, directTLS bool) (ct connTrace, conn net.Conn, session *xmpp.Session, err error) {
-	ct.auth = true
-	ct.starttls = !directTLS
-	ct.start = time.Now()
-
-	_, conn, err = dialXMPP(ctx, directTLS, tlsConfig, "", clientAddr, false)
-	if err != nil {
-		log.Printf("failed to connect to domain %s: %s", clientAddr.Domainpart(), err)
-		return ct, nil, nil, err
-	}
-
-	ct.connectDone = time.Now()
-
-	features := []xmpp.StreamFeature{
-		xmpp.SASL(
-			clientAddr.Localpart(),
-			password,
-			sasl.ScramSha256, sasl.ScramSha1, sasl.Plain,
-		),
-		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
-	}
-	if !directTLS {
-		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, tlsConfig), &ct.starttlsDone)}, features...)
-	}
-
-	session, err = xmpp.NegotiateSession(
-		ctx,
-		clientAddr.Domain(),
-		clientAddr,
-		conn,
-		false,
-		xmpp.NewNegotiator(
-			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
-			},
-		),
-	)
-	if err != nil {
-		conn.Close()
-		return ct, nil, nil, err
-	}
-
-	if !ct.starttls {
-		ct.starttlsDone = ct.connectDone
-	}
-
-	return ct, conn, session, err
-}
-
-func ProbePing(ctx context.Context, target string, cfg config.Module, registry *prometheus.Registry) bool {
+func ProbePing(ctx context.Context, target string, cfg config.Module, clients Clients, registry *prometheus.Registry) bool {
 	durationGaugeVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "probe_xmpp_duration_seconds",
 		Help: "Duration of xmpp connection by phase",
 	}, []string{"phase"})
-	registry.MustRegister(durationGaugeVec)
 
 	pingTimeoutGauge := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "probe_ping_timeout",
@@ -96,9 +43,16 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		Help: "Ping round-trip time",
 	})
 
-	client_addr, err := jid.Parse(cfg.Ping.Address)
-	if err != nil {
-		log.Printf("invalid client JID %q: %s", cfg.Ping.Address, err)
+	var session *xmpp.Session
+	var conn net.Conn
+	var ct connTrace
+
+	client, ok := clients[cfg.Ping.Account]
+	if !ok {
+		log.Printf(
+			"undeclared client: %q. probably config reload race",
+			cfg.Ping.Account,
+		)
 		return false
 	}
 
@@ -108,31 +62,36 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, registry *
 		return false
 	}
 
-	tls_cfg, err := newTLSConfig(&cfg.Ping.TLSConfig, client_addr.Domainpart())
-	if err != nil {
-		log.Printf("invalid tls cfg: %s", err)
-		return false
+	if cfg.Ping.NoSharedConnection {
+		registry.MustRegister(durationGaugeVec)
+
+		ct, conn, session, err = client.Config.Login(ctx)
+		if err != nil {
+			log.Printf(
+				"failed to establish session using %q: %s",
+				cfg.Ping.Account,
+				err,
+			)
+			return false
+		}
+		defer conn.Close()
+		defer session.Close()
+		durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
+		durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
+		durationGaugeVec.WithLabelValues("auth").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
+
+		go session.Serve(nil)
+	} else {
+		session, err = client.AcquireSession(ctx)
+		if err != nil {
+			log.Printf(
+				"failed to acquire session for ping with %q: %s",
+				cfg.Ping.Account,
+				err,
+			)
+			return false
+		}
 	}
-
-	ct, conn, session, err := login(
-		ctx,
-		tls_cfg,
-		client_addr,
-		cfg.Ping.Password,
-		cfg.Ping.DirectTLS,
-	)
-	if err != nil {
-		log.Printf("failed to establish session for %s: %s", client_addr, err)
-		return false
-	}
-	defer conn.Close()
-	defer session.Close()
-
-	durationGaugeVec.WithLabelValues("connect").Set(ct.connectDone.Sub(ct.start).Seconds())
-	durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
-	durationGaugeVec.WithLabelValues("auth").Set(ct.authDone.Sub(ct.starttlsDone).Seconds())
-
-	go session.Serve(nil)
 
 	tping := time.Now()
 

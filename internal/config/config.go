@@ -19,12 +19,12 @@ type SafeConfig struct {
 	C *Config
 }
 
-func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
-	var c = &Config{}
+func LoadConfig(confFile string) (c *Config, err error) {
+	c = &Config{}
 
 	yamlReader, err := os.Open(confFile)
 	if err != nil {
-		return fmt.Errorf("error reading config file: %s", err)
+		return nil, fmt.Errorf("error reading config file: %s", err)
 	}
 	defer yamlReader.Close()
 
@@ -32,18 +32,14 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	decoder.SetStrict(true)
 
 	if err = decoder.Decode(c); err != nil {
-		return fmt.Errorf("error parsing config file: %s", err)
+		return nil, fmt.Errorf("error parsing config file: %s", err)
 	}
 
 	if err = c.Validate(); err != nil {
-		return fmt.Errorf("error validating config file: %s", err)
+		return nil, fmt.Errorf("error validating config file: %s", err)
 	}
 
-	sc.Lock()
-	sc.C = c
-	sc.Unlock()
-
-	return nil
+	return c, nil
 }
 
 type C2SProbe struct {
@@ -72,12 +68,10 @@ type PingResult struct {
 }
 
 type PingProbe struct {
-	DirectTLS       bool             `yaml:"directtls,omitempty"`
-	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
-	Address         string           `yaml:"client_address,omitempty"`
-	Password        string           `yaml:"client_password,omitempty"`
-	PingTimeout     time.Duration    `yaml:"ping_timeout,omitempty"`
-	ExpectedResults []PingResult     `yaml:"fail_if_not,omitempty"`
+	Account            string        `yaml:"account,omitempty"`
+	NoSharedConnection bool          `yaml:"no_shared_connection,omitempty"`
+	PingTimeout        time.Duration `yaml:"ping_timeout,omitempty"`
+	ExpectedResults    []PingResult  `yaml:"fail_if_not,omitempty"`
 }
 
 func (r PingResult) Matches(other PingResult) bool {
@@ -109,8 +103,16 @@ type Module struct {
 	IBR     IBRProbe      `yaml:"ibr,omitempty"`
 }
 
+type Account struct {
+	DirectTLS bool             `yaml:"directtls,omitempty"`
+	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
+	Address   string           `yaml:"client_address,omitempty"`
+	Password  string           `yaml:"client_password,omitempty"`
+}
+
 type Config struct {
-	Modules map[string]Module `yaml:"modules"`
+	Modules  map[string]Module  `yaml:"modules"`
+	Accounts map[string]Account `yaml:"accounts"`
 }
 
 func (s *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -164,9 +166,12 @@ func (p *S2SProbe) Validate() error {
 	return nil
 }
 
-func (p *PingProbe) Validate() error {
-	if _, err := jid.Parse(p.Address); err != nil {
-		return fmt.Errorf("invalid address (%s): %q", err.Error(), p.Address)
+func (p *PingProbe) Validate(validAccounts map[string]bool) error {
+	if p.Account == "" {
+		return fmt.Errorf("invalid account name: %q", p.Account)
+	}
+	if _, ok := validAccounts[p.Account]; !ok {
+		return fmt.Errorf("account not declared: %q", p.Account)
 	}
 	return nil
 }
@@ -178,14 +183,14 @@ func (p *IBRProbe) Validate() error {
 	return nil
 }
 
-func (m *Module) Validate() error {
+func (m *Module) Validate(validAccounts map[string]bool) error {
 	switch m.Prober {
 	case "c2s":
 		return m.C2S.Validate()
 	case "s2s":
 		return m.S2S.Validate()
 	case "ping":
-		return m.Ping.Validate()
+		return m.Ping.Validate(validAccounts)
 	case "ibr":
 		return m.IBR.Validate()
 	default:
@@ -193,9 +198,24 @@ func (m *Module) Validate() error {
 	}
 }
 
+func (a *Account) Validate() error {
+	if _, err := jid.Parse(a.Address); err != nil {
+		return fmt.Errorf("invalid address (%s): %q", err.Error(), a.Address)
+	}
+	return nil
+}
+
 func (c *Config) Validate() error {
+	validAccounts := make(map[string]bool)
+	for name, account := range c.Accounts {
+		if err := account.Validate(); err != nil {
+			return fmt.Errorf("failed to validate account %q: %s", name, err.Error())
+		}
+		validAccounts[name] = true
+	}
+
 	for name, mod := range c.Modules {
-		if err := mod.Validate(); err != nil {
+		if err := mod.Validate(validAccounts); err != nil {
 			return fmt.Errorf("failed to validate module %q: %s", name, err.Error())
 		}
 	}

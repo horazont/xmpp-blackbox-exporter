@@ -59,7 +59,7 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	return tls_state, info, nil
 }
 
-func ProbeC2S(ctx context.Context, target string, config config.Module, registry *prometheus.Registry) bool {
+func ProbeC2S(ctx context.Context, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
 	probeSSLEarliestCertExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "probe_ssl_earliest_cert_expiry",
 		Help: "Returns earliest SSL cert expiry date",
@@ -92,7 +92,7 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, registry
 		return false
 	}
 
-	tls_config, err := newTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
+	tls_config, err := NewTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
 	if err != nil {
 		log.Printf("failed to process TLS config: %s", err)
 		return false
