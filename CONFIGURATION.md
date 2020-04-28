@@ -207,4 +207,12 @@ Configures an account used for in-band checks like the `<ping_probe>`.
 
     # Configure how TLS is established. Used for both direct TLS and STARTTLS.
     [ tls_config: <tls_config> ]
+
+    # The maximum timeout to wait for a health check ping reply.
+    # Health check pings are sent after a probe using the account failed. They
+    # are sent to the domain of the account. Any reply (even an IQ error) is
+    # treated as success.
+    # The probe which triggered the health check is not retried.
+    # The default is 15s.
+    [ health_check_timeout: <duration> ]
 ```

@@ -58,7 +58,7 @@ func (st *RuntimeState) ReloadConfig(path string) error {
 			)
 		}
 
-		newClients[name] = prober.NewClient(
+		client := prober.NewClient(
 			&prober.ClientConfig{
 				TLS:           tlsConfig,
 				ClientAddress: clientAddress,
@@ -66,6 +66,12 @@ func (st *RuntimeState) ReloadConfig(path string) error {
 				DirectTLS:     accountCfg.DirectTLS,
 			},
 		)
+
+		if accountCfg.HealthCheckTimeout != 0 {
+			client.HealthCheckTimeout = accountCfg.HealthCheckTimeout
+		}
+
+		newClients[name] = client
 	}
 
 	st.Lock()

@@ -116,6 +116,10 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 	if err != nil {
 		log.Printf("failed to send stanza: %s", err)
 		pingTimeoutGauge.Set(1)
+		if !cfg.Ping.NoSharedConnection {
+			// ensure that it’s still alive
+			client.Healthcheck()
+		}
 		return false
 	}
 

@@ -104,10 +104,11 @@ type Module struct {
 }
 
 type Account struct {
-	DirectTLS bool             `yaml:"directtls,omitempty"`
-	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
-	Address   string           `yaml:"client_address,omitempty"`
-	Password  string           `yaml:"client_password,omitempty"`
+	DirectTLS          bool             `yaml:"directtls,omitempty"`
+	TLSConfig          config.TLSConfig `yaml:"tls_config,omitempty"`
+	Address            string           `yaml:"client_address,omitempty"`
+	Password           string           `yaml:"client_password,omitempty"`
+	HealthCheckTimeout time.Duration    `yaml:"health_check_timeout,omitempty"`
 }
 
 type Config struct {

@@ -3,6 +3,7 @@ package prober
 import (
 	"context"
 	"crypto/tls"
+	"encoding/xml"
 	"errors"
 	"log"
 	"net"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"mellium.im/sasl"
+	"mellium.im/xmlstream"
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"
+	"mellium.im/xmpp/stanza"
 )
 
 var ErrClientClosed = errors.New("The client is already closed")
@@ -78,7 +81,8 @@ type ClientFactory interface {
 }
 
 type Client struct {
-	Config *ClientConfig
+	Config             *ClientConfig
+	HealthCheckTimeout time.Duration
 
 	// runtime state
 	sessionLock sync.Mutex
@@ -86,11 +90,15 @@ type Client struct {
 	session     *xmpp.Session
 	isAlive     bool
 	closed      bool
+
+	healthCheckLock    sync.Mutex
+	healthCheckRunning bool
 }
 
 func NewClient(Config *ClientConfig) *Client {
 	result := new(Client)
 	result.Config = Config
+	result.HealthCheckTimeout = 15 * time.Second
 	return result
 }
 
@@ -131,6 +139,82 @@ func (c *Client) createSession(ctx context.Context) error {
 
 	go c.runSession()
 	return nil
+}
+
+// Schedule a healthcheck if there isn’t currently one running
+//
+// If the healthcheck fails, the connection will be closed and a new session
+// will be established for the next use.
+func (c *Client) Healthcheck() {
+	c.healthCheckLock.Lock()
+	defer c.healthCheckLock.Unlock()
+	if c.healthCheckRunning {
+		return
+	}
+
+	c.sessionLock.Lock()
+	defer c.sessionLock.Unlock()
+	if !c.isAlive {
+		return
+	}
+
+	c.healthCheckRunning = true
+	go c.healthcheck()
+}
+
+func (c *Client) healthcheck() {
+	c.healthCheckLock.Lock()
+	defer c.healthCheckLock.Unlock()
+	defer func() {
+		c.healthCheckRunning = false
+	}()
+
+	iq := stanza.IQ{
+		To:   c.Config.ClientAddress,
+		Type: stanza.GetIQ,
+	}
+
+	session := func() *xmpp.Session {
+		c.sessionLock.Lock()
+		defer c.sessionLock.Unlock()
+		if !c.isAlive {
+			return nil
+		}
+		return c.session
+	}()
+	if session == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.HealthCheckTimeout)
+	response_stream, err := session.SendIQElement(
+		ctx,
+		xmlstream.Wrap(
+			nil,
+			xml.StartElement{Name: xml.Name{Local: "ping", Space: "urn:xmpp:ping"}},
+		),
+		iq,
+	)
+	cancel()
+	if response_stream != nil {
+		defer response_stream.Close()
+	}
+
+	if err != nil {
+		log.Printf("health check on client failed: %s", err)
+		c.abort()
+		return
+	}
+
+	response := struct {
+		stanza.IQ
+		Error stanza.Error `xml:"jabber:client error"`
+		Ping  struct{}     `xml:"urn:xmpp:ping ping"`
+	}{}
+	d := xml.NewTokenDecoder(response_stream)
+	start_token, err := d.Token()
+	start := start_token.(xml.StartElement)
+	d.DecodeElement(&response, &start)
 }
 
 func (c *Client) runSession() {
