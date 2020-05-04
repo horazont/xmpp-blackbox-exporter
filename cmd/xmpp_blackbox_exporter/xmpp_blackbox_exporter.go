@@ -149,7 +149,6 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config, c
 
 	if success {
 		probeSuccessGauge.Set(1)
-		log.Printf("probe succeeded")
 	} else {
 		log.Printf("probe failed")
 	}
