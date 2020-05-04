@@ -3,6 +3,7 @@ package prober
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"log"
 	"net"
 	"time"
@@ -13,6 +14,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
+)
+
+var (
+	ErrNoTLS = errors.New("TLS not negotiated")
 )
 
 func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_config *tls.Config, ct *connTrace) (tls_state *tls.ConnectionState, info StreamInfo, err error) {
@@ -46,7 +51,10 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	info.Negotiated = true
 
 	if tls_config != nil {
-		tls_conn := capture.CapturedWriter.(*tls.Conn)
+		tls_conn, ok := capture.CapturedWriter.(*tls.Conn)
+		if !ok {
+			return tls_state, info, ErrNoTLS
+		}
 		err = tls_conn.Handshake()
 		if err != nil {
 			return tls_state, info, err

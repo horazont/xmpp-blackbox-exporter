@@ -51,7 +51,10 @@ func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JI
 	info.Negotiated = true
 
 	if tls_config != nil {
-		tls_conn := capture.CapturedWriter.(*tls.Conn)
+		tls_conn, ok := capture.CapturedWriter.(*tls.Conn)
+		if !ok {
+			return tls_state, info, ErrNoTLS
+		}
 		err = tls_conn.Handshake()
 		if err != nil {
 			return tls_state, info, err
