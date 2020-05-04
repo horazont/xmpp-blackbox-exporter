@@ -125,7 +125,7 @@ func ProbeS2S(ctx context.Context, target string, config config.Module, _ Client
 	ct.starttls = !config.S2S.DirectTLS
 	ct.start = time.Now()
 
-	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, to, true)
+	tls_state_from_dial, conn, err := dialXMPP(ctx, config.S2S.DirectTLS, tls_config, host, to, true, config.S2S.RestrictAddressFamily)
 	if err != nil {
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false

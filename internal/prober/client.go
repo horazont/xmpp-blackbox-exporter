@@ -31,7 +31,7 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 	ct.starttls = !cfg.DirectTLS
 	ct.start = time.Now()
 
-	_, conn, err = dialXMPP(ctx, cfg.DirectTLS, cfg.TLS, "", cfg.ClientAddress, false)
+	_, conn, err = dialXMPP(ctx, cfg.DirectTLS, cfg.TLS, "", cfg.ClientAddress, false, "")
 	if err != nil {
 		log.Printf("failed to connect to domain %s: %s", cfg.ClientAddress.Domainpart(), err)
 		return ct, nil, nil, err
