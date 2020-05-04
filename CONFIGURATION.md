@@ -27,6 +27,8 @@ The top level of the configuration file is a mapping with a single key
 ```yml
 modules:
     <string>: <module>
+accounts:
+    <string>: <account>
 ```
 
 ### <module>
@@ -127,17 +129,13 @@ Log into a provisioned XMPP account and send an XMPP Ping (XEP-0199) to the
 target entity of the probe.
 
 ```yml
-    # If true, _xmpps-client SRV records will be used instead of _xmpp-client
-    # SRV records and direct TLS will be used instead of STARTTLS
-    [ directtls: <boolean> ]
+    # The name of the account to use, as defined on the top level.
+    account: <string>
 
-    # Configure how TLS is established. Used for both direct TLS and STARTTLS.
-    [ tls_config: <tls_config> ]
-
-    # The credentials to connect with for sending the ping. At this time, only
-    # password authentication is supported.
-    client_address: <string>
-    client_password: <string>
+    # If set to true, this ping probe will always create a fresh XMPP
+    # connection which will be discarded afterwards instead of sharing a
+    # single connection for multiple checks using the same account.
+    [ no_shared_connection: <boolean> ]
 
     # Explicitly specify which results are allowed; if omitted, it defaults to
     # the successful result.
@@ -192,3 +190,29 @@ delete it.
 ### <tls_config>
 
 See [upstream configuration](https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md#tls_config).
+
+### <account>
+
+Configures an account used for in-band checks like the `<ping_probe>`.
+
+```yml
+    # The credentials to connect with for sending the ping. At this time, only
+    # password authentication is supported.
+    client_address: <string>
+    client_password: <string>
+
+    # If true, _xmpps-client SRV records will be used instead of _xmpp-client
+    # SRV records and direct TLS will be used instead of STARTTLS
+    [ directtls: <boolean> ]
+
+    # Configure how TLS is established. Used for both direct TLS and STARTTLS.
+    [ tls_config: <tls_config> ]
+
+    # The maximum timeout to wait for a health check ping reply.
+    # Health check pings are sent after a probe using the account failed. They
+    # are sent to the domain of the account. Any reply (even an IQ error) is
+    # treated as success.
+    # The probe which triggered the health check is not retried.
+    # The default is 15s.
+    [ health_check_timeout: <duration> ]
+```

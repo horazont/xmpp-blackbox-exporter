@@ -90,7 +90,7 @@ func parseTarget(target string, s2s bool) (string, jid.JID, error) {
 	return host, addr, nil
 }
 
-func newTLSConfig(cfg *pconfig.TLSConfig, domain string) (*tls.Config, error) {
+func NewTLSConfig(cfg *pconfig.TLSConfig, domain string) (*tls.Config, error) {
 	tls_config, err := pconfig.NewTLSConfig(cfg)
 	if err != nil {
 		return nil, err
