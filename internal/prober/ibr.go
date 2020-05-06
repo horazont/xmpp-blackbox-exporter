@@ -134,7 +134,7 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 	ct.starttls = !config.IBR.DirectTLS
 	ct.start = time.Now()
 
-	_, conn, err := dialXMPP(ctx, config.IBR.DirectTLS, tls_config, host, addr, false)
+	_, conn, err := dialXMPP(ctx, config.IBR.DirectTLS, tls_config, host, addr, false, config.IBR.RestrictAddressFamily)
 	if err != nil {
 		log.Printf("failed to probe c2s to %s: %s", target, err)
 		return false

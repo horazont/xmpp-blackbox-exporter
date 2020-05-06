@@ -3,17 +3,23 @@ package prober
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	pconfig "github.com/prometheus/common/config"
 
 	"mellium.im/xmpp/dial"
 	"mellium.im/xmpp/jid"
+
+	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
 )
+
+var ErrNotThisNetwork = errors.New("address family disabled by config and configured address family not offered")
 
 type connTrace struct {
 	starttls     bool
@@ -24,17 +30,27 @@ type connTrace struct {
 	authDone     time.Time
 }
 
-func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool, restrictAddressFamily config.AddressFamily) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+
+	controlFunc := func(network, address string, c syscall.RawConn) error {
+		if restrictAddressFamily.MatchesNetwork(network) {
+			return nil
+		}
+		return ErrNotThisNetwork
+	}
+
 	if host == "" {
 		dialer := dial.Dialer{
 			NoTLS:     !directTLS,
 			S2S:       s2s,
 			TLSConfig: tls_config,
 		}
+		dialer.Control = controlFunc
 		dialer.Deadline, _ = ctx.Deadline()
 		conn, err = dialer.Dial(ctx, "tcp", to)
 	} else {
 		dialer := net.Dialer{}
+		dialer.Control = controlFunc
 		dialer.Deadline, _ = ctx.Deadline()
 		conn, err = dialer.Dial("tcp", host)
 	}

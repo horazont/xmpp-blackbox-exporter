@@ -76,6 +76,10 @@ and check offered SASL mechanisms.
     # Configure how TLS is established. Used for both direct TLS and STARTTLS.
     [ tls_config: <tls_config> ]
 
+    # If set, only the IP protocol version given below will be used. If the
+    # XMPP service is not reachable under that version, the check will fail.
+    [ restrict_ip_version: <ip_version> ]
+
 ```
 
 ### <s2s_probe>
@@ -120,6 +124,10 @@ and check offered SASL mechanisms as well as dialback.
     # In addition, a Gauge indicating the presence of the dialback feature is
     # exported.
     [ export_auth_mechanisms: <boolean> ]
+
+    # If set, only the IP protocol version given below will be used. If the
+    # XMPP service is not reachable under that version, the check will fail.
+    [ restrict_ip_version: <ip_version> ]
 
 ```
 
@@ -185,6 +193,10 @@ delete it.
     # cause a high cardinality in these labels, so enable with care.
     [ export_error_info: <boolean> ]
 
+    # If set, only the IP protocol version given below will be used. If the
+    # XMPP service is not reachable under that version, the check will fail.
+    [ restrict_ip_version: <ip_version> ]
+
 ```
 
 ### <tls_config>
@@ -216,3 +228,7 @@ Configures an account used for in-band checks like the `<ping_probe>`.
     # The default is 15s.
     [ health_check_timeout: <duration> ]
 ```
+
+### <ip_version>
+
+A string with one of the following values: ``ipv4``, ``ipv6``.

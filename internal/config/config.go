@@ -48,6 +48,7 @@ type C2SProbe struct {
 	RequireSASLMechanisms []string         `yaml:"fail_if_sasl_mechanism_not_offered,omitempty"`
 	ForbidSASLMechanisms  []string         `yaml:"fail_if_sasl_mechanism_offered,omitempty"`
 	ExportSASLMechanisms  bool             `yaml:"export_sasl_mechanisms,omitempty"`
+	RestrictAddressFamily AddressFamily    `yaml:"restrict_ip_version,omitempty"`
 }
 
 type S2SProbe struct {
@@ -59,6 +60,7 @@ type S2SProbe struct {
 	ForbidDialback        bool             `yaml:"fail_if_dialback_offered,omitempty"`
 	ExportAuthMechanisms  bool             `yaml:"export_auth_mechanisms,omitempty"`
 	From                  string           `yaml:"from"`
+	RestrictAddressFamily AddressFamily    `yaml:"restrict_ip_version,omitempty"`
 }
 
 type PingResult struct {
@@ -88,10 +90,11 @@ func (r PingResult) Matches(other PingResult) bool {
 }
 
 type IBRProbe struct {
-	Prefix          string           `yaml:"prefix,omitempty"`
-	TLSConfig       config.TLSConfig `yaml:"tls_config,omitempty"`
-	DirectTLS       bool             `yaml:"directtls,omitempty"`
-	ExportErrorInfo bool             `yaml:"export_error_info,omitempty"`
+	Prefix                string           `yaml:"prefix,omitempty"`
+	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
+	DirectTLS             bool             `yaml:"directtls,omitempty"`
+	ExportErrorInfo       bool             `yaml:"export_error_info,omitempty"`
+	RestrictAddressFamily AddressFamily    `yaml:"restrict_ip_version,omitempty"`
 }
 
 type Module struct {
@@ -142,6 +145,9 @@ func (s *PingProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (p *C2SProbe) Validate() error {
+	if err := p.RestrictAddressFamily.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -164,6 +170,10 @@ func (p *S2SProbe) Validate() error {
 		return fmt.Errorf("cannot both require and forbid dialback")
 	}
 
+	if err := p.RestrictAddressFamily.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -180,6 +190,10 @@ func (p *PingProbe) Validate(validAccounts map[string]bool) error {
 func (p *IBRProbe) Validate() error {
 	if p.Prefix == "" {
 		return fmt.Errorf("prefix must not be empty")
+	}
+
+	if err := p.RestrictAddressFamily.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
