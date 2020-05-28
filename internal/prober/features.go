@@ -60,6 +60,7 @@ func CheckSASLOffered(offered *bool, mechanisms *[]string) xmpp.StreamFeature {
 	orig_stream_feature := xmpp.SASL("", "", sasl.Plain)
 	return xmpp.StreamFeature{
 		Name:       orig_stream_feature.Name,
+		Necessary:  xmpp.Secure,
 		Prohibited: xmpp.Authn,
 		List:       noSendingFeatures,
 		Parse: func(ctx context.Context, r *xml.Decoder, start *xml.StartElement) (req bool, data interface{}, err error) {
