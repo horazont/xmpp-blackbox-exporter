@@ -202,6 +202,8 @@ func (c *Client) healthcheck() {
 
 	if err != nil {
 		log.Printf("health check on client failed: %s", err)
+		c.sessionLock.Lock()
+		defer c.sessionLock.Unlock()
 		c.abort()
 		return
 	}
