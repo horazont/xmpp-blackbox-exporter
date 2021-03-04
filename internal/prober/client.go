@@ -128,7 +128,7 @@ func (c *Client) AcquireSession(ctx context.Context) (*xmpp.Session, error) {
 }
 
 func (c *Client) createSession(ctx context.Context) error {
-	_, conn, session, err := c.Config.Login(context.TODO())
+	_, conn, session, err := c.Config.Login(ctx)
 	if err != nil {
 		return err
 	}
