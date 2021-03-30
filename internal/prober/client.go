@@ -48,19 +48,23 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 		traceStreamFeature(xmpp.BindResource(), &ct.authDone),
 	}
 	if !cfg.DirectTLS {
-		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(true, cfg.TLS), &ct.starttlsDone)}, features...)
+		features = append([]xmpp.StreamFeature{traceStreamFeature(xmpp.StartTLS(cfg.TLS), &ct.starttlsDone)}, features...)
 	}
 
-	session, err = xmpp.NegotiateSession(
+	session, err = xmpp.NewSession(
 		ctx,
 		cfg.ClientAddress.Domain(),
 		cfg.ClientAddress,
 		conn,
-		false,
+		0,
 		xmpp.NewNegotiator(
 			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
+				Lang: "en",
+				Features: func(s *xmpp.Session, _features ...xmpp.StreamFeature) []xmpp.StreamFeature {
+					return features
+				},
+				// TeeOut: teeLogger{prefix: "OUT: "},
+				// TeeIn: teeLogger{prefix: "IN: "},
 			},
 		),
 	)

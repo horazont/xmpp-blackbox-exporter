@@ -38,7 +38,7 @@ func NewCapturingStartTLS(cfg *tls.Config) *StartTLSCapture {
 }
 
 func (c *StartTLSCapture) ToStreamFeature() xmpp.StreamFeature {
-	orig_stream_feature := xmpp.StartTLS(true, c.cfg)
+	orig_stream_feature := xmpp.StartTLS(c.cfg)
 	return xmpp.StreamFeature{
 		Name:       orig_stream_feature.Name,
 		Prohibited: orig_stream_feature.Prohibited,
@@ -62,7 +62,7 @@ func CheckSASLOffered(offered *bool, mechanisms *[]string) xmpp.StreamFeature {
 		Name:       orig_stream_feature.Name,
 		Prohibited: xmpp.Authn,
 		List:       noSendingFeatures,
-		Parse: func(ctx context.Context, r xml.TokenReader, start *xml.StartElement) (req bool, data interface{}, err error) {
+		Parse: func(ctx context.Context, r *xml.Decoder, start *xml.StartElement) (req bool, data interface{}, err error) {
 			req, data, err = orig_stream_feature.Parse(ctx, r, start)
 			*offered = true
 			*mechanisms = data.([]string)
@@ -82,7 +82,7 @@ func CheckDialbackOffered(offered *bool) xmpp.StreamFeature {
 		},
 		Prohibited: xmpp.Authn,
 		List:       noSendingFeatures,
-		Parse: func(ctx context.Context, r xml.TokenReader, start *xml.StartElement) (req bool, data interface{}, err error) {
+		Parse: func(ctx context.Context, r *xml.Decoder, start *xml.StartElement) (req bool, data interface{}, err error) {
 			*offered = true
 			parsed := struct {
 				XMLName xml.Name `xml:"urn:xmpp:features:dialback dialback"`
@@ -164,7 +164,7 @@ func Register(prefix string, server string, account *jid.JID, password *string) 
 		Prohibited: xmpp.Authn,
 		Necessary:  xmpp.Secure,
 		List:       noSendingFeatures,
-		Parse: func(ctx context.Context, r xml.TokenReader, start *xml.StartElement) (req bool, data interface{}, err error) {
+		Parse: func(ctx context.Context, r *xml.Decoder, start *xml.StartElement) (req bool, data interface{}, err error) {
 			parsed := struct {
 				XMLName xml.Name `xml:"http://jabber.org/features/iq-register register"`
 			}{}

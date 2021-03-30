@@ -45,18 +45,11 @@ func (c *ibrCheckContext) executeRegistration(conn net.Conn, tls_config *tls.Con
 	}
 	features = append(features, Register(c.config.Prefix, c.domain.Domainpart(), &c.accountInfo.Account, &c.accountInfo.Password))
 
-	session, err := xmpp.NegotiateSession(
+	session, err := xmpp.NewClientSession(
 		c.ctx,
-		c.domain,
 		c.streamFrom,
 		conn,
-		false,
-		xmpp.NewNegotiator(
-			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
-			},
-		),
+		features...,
 	)
 	defer session.Close()
 

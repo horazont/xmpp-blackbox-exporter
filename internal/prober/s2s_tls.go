@@ -29,19 +29,12 @@ func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JI
 		CheckDialbackOffered(&info.DialbackOffered),
 	)
 
-	session, err := xmpp.NegotiateSession(
+	session, err := xmpp.NewServerSession(
 		ctx,
 		to.Domain(),
 		from,
 		conn,
-		false,
-		xmpp.NewNegotiator(
-			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
-				S2S:      true,
-			},
-		),
+		features...,
 	)
 	defer session.Close()
 

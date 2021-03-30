@@ -29,18 +29,11 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	}
 	features = append(features, CheckSASLOffered(&info.SASLOffered, &info.SASLMechanisms))
 
-	session, err := xmpp.NegotiateSession(
+	session, err := xmpp.NewClientSession(
 		ctx,
-		addr.Domain(),
 		addr,
 		conn,
-		false,
-		xmpp.NewNegotiator(
-			xmpp.StreamConfig{
-				Lang:     "en",
-				Features: features,
-			},
-		),
+		features...,
 	)
 	defer session.Close()
 
