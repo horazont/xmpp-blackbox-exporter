@@ -8,4 +8,4 @@ import (
 	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
 )
 
-type ProbeFn func(ctx context.Context, target string, config config.Module, clients Clients, registry *prometheus.Registry) bool
+type ProbeFn func(ctx context.Context, module, target string, config config.Module, clients Clients, registry *prometheus.Registry) bool

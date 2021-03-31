@@ -3,9 +3,9 @@ package prober
 import (
 	"context"
 	"encoding/xml"
-	"log"
 	"net"
 	"time"
+	"go.uber.org/zap"
 
 	"mellium.im/xmlstream"
 	"mellium.im/xmpp"
@@ -19,14 +19,19 @@ import (
 
 type teeLogger struct {
 	prefix string
+	logger *zap.Logger
 }
 
 func (l teeLogger) Write(p []byte) (n int, err error) {
-	log.Printf("%s %s", l.prefix, p)
+	l.logger.Debug(l.prefix,
+		zap.Binary("data", p),
+	)
 	return len(p), nil
 }
 
-func ProbePing(ctx context.Context, target string, cfg config.Module, clients Clients, registry *prometheus.Registry) bool {
+func ProbePing(ctx context.Context, module, target string, cfg config.Module, clients Clients, registry *prometheus.Registry) bool {
+	sl := zap.S()
+
 	durationGaugeVec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "probe_xmpp_duration_seconds",
 		Help: "Duration of xmpp connection by phase",
@@ -49,16 +54,20 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 
 	client, ok := clients[cfg.Ping.Account]
 	if !ok {
-		log.Printf(
-			"undeclared client: %q. probably config reload race",
-			cfg.Ping.Account,
+		sl.Errorw("undeclared client; probably config reload race",
+			"account", cfg.Ping.Account,
+			"module", module,
 		)
 		return false
 	}
 
 	target_addr, err := jid.Parse(target)
 	if err != nil {
-		log.Printf("invalid target JID %q: %s", target, err)
+		sl.Errorw("invalid ping probe target JID",
+			"target", target,
+			"module", module,
+			"err", err,
+		)
 		return false
 	}
 
@@ -67,10 +76,11 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 
 		ct, conn, session, err = client.Config.Login(ctx)
 		if err != nil {
-			log.Printf(
-				"failed to establish session using %q: %s",
-				cfg.Ping.Account,
-				err,
+			sl.Errorw("failed to established non-shared session for ping",
+				"target", target,
+				"account", cfg.Ping.Account,
+				"module", module,
+				"err", err,
 			)
 			return false
 		}
@@ -84,10 +94,11 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 	} else {
 		session, err = client.AcquireSession(ctx)
 		if err != nil {
-			log.Printf(
-				"failed to acquire session for ping with %q: %s",
-				cfg.Ping.Account,
-				err,
+			sl.Errorw("failed to acquire shared session for ping",
+				"target", target,
+				"account", cfg.Ping.Account,
+				"module", module,
+				"err", err,
 			)
 			return false
 		}
@@ -114,7 +125,12 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 	pingRTTGauge.Set(tpong.Sub(tping).Seconds())
 
 	if err != nil {
-		log.Printf("failed to send stanza: %s", err)
+		sl.Errorw("failed to send stanza",
+			"target", target,
+			"account", cfg.Ping.Account,
+			"module", module,
+			"err", err,
+		)
 		pingTimeoutGauge.Set(1)
 		if !cfg.Ping.NoSharedConnection {
 			// ensure that it’s still alive
@@ -133,7 +149,12 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 	start := start_token.(xml.StartElement)
 	err = d.DecodeElement(&response, &start)
 	if err != nil {
-		log.Printf("failed to parse: %s", err)
+		sl.Errorw("failed to parse ping reply",
+			"target", target,
+			"account", cfg.Ping.Account,
+			"module", module,
+			"err", err,
+		)
 		return false
 	}
 
@@ -144,7 +165,12 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 		result.ErrorType = string(response.Error.Type)
 		result.ErrorCondition = string(response.Error.Condition)
 	} else {
-		log.Printf("failed to parse: %s", err)
+		sl.Errorw("failed to parse ping result",
+			"target", target,
+			"account", cfg.Ping.Account,
+			"module", module,
+			"err", err,
+		)
 		return false
 	}
 
@@ -159,5 +185,10 @@ func ProbePing(ctx context.Context, target string, cfg config.Module, clients Cl
 		}
 	}
 
+	sl.Debugw("ping result did not match requirements, returning error",
+		"target", target,
+		"module", module,
+		"account", cfg.Ping.Account,
+	)
 	return false
 }

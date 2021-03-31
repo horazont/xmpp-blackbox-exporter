@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"mellium.im/xmpp/jid"
 
@@ -143,14 +144,12 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config, c
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
 
-	success := prober(ctx, target, module, clients, registry)
+	success := prober(ctx, moduleName, target, module, clients, registry)
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
 
 	if success {
 		probeSuccessGauge.Set(1)
-	} else {
-		log.Printf("probe failed")
 	}
 
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
@@ -158,13 +157,25 @@ func probeHandler(w http.ResponseWriter, r *http.Request, conf *config.Config, c
 }
 
 func run() int {
+	cfg := zap.NewProductionConfig()
+	cfg.Level.SetLevel(zapcore.DebugLevel)
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	logger, _ := cfg.Build()
+	defer logger.Sync()
+	sl := logger.Sugar()
+	undo := zap.ReplaceGlobals(logger)
+	defer undo()
+
 	config_file := flag.String("config.file", "", "")
 	listen_address := flag.String("web.listen-address", "localhost:9604", "")
 
 	flag.Parse()
 
 	if err := sc.ReloadConfig(*config_file); err != nil {
-		log.Printf("failed to load config file from %s: %s", *config_file, err)
+		zap.S().Errorw("failed to load config file",
+			"config_file", *config_file,
+			"err", err,
+		)
 		return 2
 	}
 
@@ -176,16 +187,26 @@ func run() int {
 			select {
 			case <-hup:
 				if err := sc.ReloadConfig(*config_file); err != nil {
-					log.Printf("failed to reload config file from %s: %s", *config_file, err)
+					sl.Errorw("failed to reload config file",
+						"config_file", *config_file,
+						"err", err,
+					)
 					continue
 				}
-				log.Printf("reloaded configuration from %s", *config_file)
+				sl.Debugw("reloaded configuration",
+					"config_file", *config_file,
+				)
 			case rc := <-reloadCh:
 				if err := sc.ReloadConfig(*config_file); err != nil {
-					log.Printf("failed to reload config file from %s: %s", *config_file, err)
+					sl.Errorw("failed to reload config file",
+						"config_file", *config_file,
+						"err", err,
+					)
 					rc <- err
 				} else {
-					log.Printf("reloaded configuration from %s", *config_file)
+					sl.Debugw("reloaded configuration",
+						"config_file", *config_file,
+					)
 					rc <- nil
 				}
 			}
@@ -214,9 +235,13 @@ func run() int {
 	signal.Notify(term, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("listening on address %s", *listen_address)
+		sl.Infow("listener set up",
+			"address", *listen_address,
+		)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Printf("error starting http server: %s", err)
+			sl.Errorw("failed to start HTTP server",
+				"err", err,
+			)
 			close(srvc)
 		}
 	}()
@@ -224,7 +249,7 @@ func run() int {
 	for {
 		select {
 		case <-term:
-			log.Printf("received signal, stopping gracefully")
+			sl.Infow("received signal, stopping gracefully")
 			return 0
 		case <-srvc:
 			return 1

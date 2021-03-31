@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/xml"
-	"log"
 	"net"
 	"time"
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -91,16 +91,26 @@ func cancelRegistrationTokenReader() xml.TokenReader {
 	)
 }
 
-func ProbeIBR(ctx context.Context, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
+func ProbeIBR(ctx context.Context, module, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
+	sl := zap.S()
+
 	host, addr, err := parseTarget(target, false)
 	if err != nil {
-		log.Printf("failed to parse target %s: %s", target, err)
+		sl.Errorw("failed to parse IBR probe target",
+			"target", target,
+			"module", module,
+			"err", err,
+		)
 		return false
 	}
 
 	tls_config, err := NewTLSConfig(&config.IBR.TLSConfig, addr.Domainpart())
 	if err != nil {
-		log.Printf("failed to process TLS config: %s", err)
+		sl.Errorw("failed to process TLS config for IBR probe",
+			"module", module,
+			"target", target,
+			"err", err,
+		)
 		return false
 	}
 
@@ -129,7 +139,12 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 
 	_, conn, err := dialXMPP(ctx, config.IBR.DirectTLS, tls_config, host, addr, false, config.IBR.RestrictAddressFamily)
 	if err != nil {
-		log.Printf("failed to probe c2s to %s: %s", target, err)
+		sl.Errorw("failed to dial for IBR probe",
+			"module", module,
+			"target", target,
+			"phase", "registration",
+			"err", err,
+		)
 		return false
 	}
 	defer conn.Close()
@@ -151,7 +166,12 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 	c.durationGaugeVec.WithLabelValues("starttls").Set(ct.starttlsDone.Sub(ct.connectDone).Seconds())
 
 	if err != nil {
-		log.Printf("registration failed: %s", err.Error())
+		sl.Debugw("registration failed",
+			"module", module,
+			"target", target,
+			"phase", "registration",
+			"err", err,
+		)
 
 		stanzaError, ok := err.(*stanza.Error)
 		if ok && config.IBR.ExportErrorInfo {
@@ -175,7 +195,12 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 	}
 	ct, conn, session, err := clientCfg.Login(c.ctx)
 	if err != nil {
-		log.Printf("failed to establish session for %s: %s", c.accountInfo.Account, err)
+		sl.Errorw("failed to dial for IBR probe",
+			"module", module,
+			"target", target,
+			"phase", "validation",
+			"err", err,
+		)
 	}
 	defer conn.Close()
 	defer session.Close()
@@ -194,7 +219,12 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 	}
 
 	if err != nil {
-		log.Printf("failed to cancel registration: %s", err.Error())
+		sl.Errorw("failed to log into account after IBR probe",
+			"module", module,
+			"target", target,
+			"phase", "validation",
+			"err", err,
+		)
 		return false
 	}
 
@@ -207,12 +237,22 @@ func ProbeIBR(ctx context.Context, target string, config config.Module, _ Client
 	start := start_token.(xml.StartElement)
 	err = d.DecodeElement(&response, &start)
 	if err != nil {
-		log.Printf("failed to decode cancellation reply: %s", err.Error())
+		sl.Errorw("failed to parse cancellation reply after IBR probe",
+			"module", module,
+			"target", target,
+			"phase", "validation",
+			"err", err,
+		)
 		return false
 	}
 
 	if response.Type != stanza.ResultIQ {
-		log.Printf("failed to cancel registration: %s", response.Error.Condition)
+		sl.Errorw("failed to cancel account after IBR probe",
+			"module", module,
+			"target", target,
+			"phase", "validation",
+			"err", err,
+		)
 		return false
 	}
 

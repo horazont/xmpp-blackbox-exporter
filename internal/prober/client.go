@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/xml"
 	"errors"
-	"log"
 	"net"
 	"sync"
 	"time"
+	"go.uber.org/zap"
 
 	"mellium.im/sasl"
 	"mellium.im/xmlstream"
@@ -27,13 +27,18 @@ type ClientConfig struct {
 }
 
 func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn, session *xmpp.Session, err error) {
+	sl := zap.S()
+
 	ct.auth = true
 	ct.starttls = !cfg.DirectTLS
 	ct.start = time.Now()
 
 	_, conn, err = dialXMPP(ctx, cfg.DirectTLS, cfg.TLS, "", cfg.ClientAddress, false, "")
 	if err != nil {
-		log.Printf("failed to connect to domain %s: %s", cfg.ClientAddress.Domainpart(), err)
+		sl.Debugw("failed to connect for client session",
+			"domain", cfg.ClientAddress.Domainpart(),
+			"err", err,
+		)
 		return ct, nil, nil, err
 	}
 
@@ -63,13 +68,15 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 				Features: func(s *xmpp.Session, _features ...xmpp.StreamFeature) []xmpp.StreamFeature {
 					return features
 				},
-				// TeeOut: teeLogger{prefix: "OUT: "},
-				// TeeIn: teeLogger{prefix: "IN: "},
 			},
 		),
 	)
 	if err != nil {
 		conn.Close()
+		sl.Debugw("stream negotiation failed for client session",
+			"domain", cfg.ClientAddress.Domainpart(),
+			"err", err,
+		)
 		return ct, nil, nil, err
 	}
 
@@ -112,19 +119,34 @@ func NewClient(Config *ClientConfig) *Client {
 // If session establishment fails, it is not retried, but an error is returned.
 // The next call to AcquireSession will retry.
 func (c *Client) AcquireSession(ctx context.Context) (*xmpp.Session, error) {
+	sl := zap.S()
+
 	c.sessionLock.Lock()
 	defer c.sessionLock.Unlock()
 
 	if c.closed {
+		sl.Debugw("attempt to use closed client session",
+			"client_address", c.Config.ClientAddress.String(),
+		)
 		return nil, ErrClientClosed
 	}
 
 	if !c.isAlive {
+		sl.Debugw("client session not alive, recreating",
+			"client_address", c.Config.ClientAddress.String(),
+		)
 		err := c.createSession(ctx)
 		if err != nil {
+			sl.Warnw("failed to recreate offline client session",
+				"client_address", c.Config.ClientAddress.String(),
+				"err", err,
+			)
 			return nil, err
 		}
 
+		sl.Infow("client session established",
+			"client_address", c.Config.ClientAddress.String(),
+		)
 		return c.session, nil
 	}
 
@@ -167,6 +189,8 @@ func (c *Client) Healthcheck() {
 }
 
 func (c *Client) healthcheck() {
+	sl := zap.S()
+
 	c.healthCheckLock.Lock()
 	defer c.healthCheckLock.Unlock()
 	defer func() {
@@ -187,6 +211,10 @@ func (c *Client) healthcheck() {
 		return c.session
 	}()
 	if session == nil {
+		sl.Warnw("client health check failed",
+			"client_address", c.Config.ClientAddress.String(),
+			"err", "session nil",
+		)
 		return
 	}
 
@@ -205,7 +233,10 @@ func (c *Client) healthcheck() {
 	}
 
 	if err != nil {
-		log.Printf("health check on client failed: %s", err)
+		sl.Warnw("client health check failed",
+			"client_address", c.Config.ClientAddress.String(),
+			"err", err,
+		)
 		c.sessionLock.Lock()
 		defer c.sessionLock.Unlock()
 		c.abort()
@@ -225,7 +256,10 @@ func (c *Client) healthcheck() {
 
 func (c *Client) runSession() {
 	err := c.session.Serve(nil)
-	log.Printf("client session closed: %s", err)
+	zap.S().Infow("client session closed",
+		"client_address", c.Config.ClientAddress.String(),
+		"err", err,
+	)
 	c.sessionLock.Lock()
 	defer c.sessionLock.Unlock()
 	// instakill after error

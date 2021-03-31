@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"log"
 	"net"
 	"time"
+	"go.uber.org/zap"
 
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"
@@ -60,7 +60,9 @@ func executeProbeC2S(ctx context.Context, conn net.Conn, addr jid.JID, tls_confi
 	return tls_state, info, nil
 }
 
-func ProbeC2S(ctx context.Context, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
+func ProbeC2S(ctx context.Context, module, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
+	sl := zap.S()
+
 	probeSSLEarliestCertExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "probe_ssl_earliest_cert_expiry",
 		Help: "Returns earliest SSL cert expiry date",
@@ -89,13 +91,21 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, _ Client
 
 	host, addr, err := parseTarget(target, false)
 	if err != nil {
-		log.Printf("failed to parse target %s: %s", target, err)
+		sl.Errorw("failed to parse c2s probe target",
+			"target", target,
+			"module", module,
+			"err", err,
+		)
 		return false
 	}
 
 	tls_config, err := NewTLSConfig(&config.C2S.TLSConfig, addr.Domainpart())
 	if err != nil {
-		log.Printf("failed to process TLS config: %s", err)
+		sl.Errorw("failed to process TLS config for c2s probe",
+			"module", module,
+			"target", target,
+			"err", err,
+		)
 		return false
 	}
 
@@ -106,7 +116,11 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, _ Client
 
 	tls_state_from_dial, conn, err := dialXMPP(ctx, config.C2S.DirectTLS, tls_config, host, addr, false, config.C2S.RestrictAddressFamily)
 	if err != nil {
-		log.Printf("failed to probe c2s to %s: %s", target, err)
+		sl.Errorw("failed to dial for c2s probe",
+			"module", module,
+			"target", target,
+			"err", err,
+		)
 		return false
 	}
 	defer conn.Close()
@@ -137,7 +151,11 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, _ Client
 	}
 
 	if !tls_state.HandshakeComplete {
-		log.Printf("handshake not completed: %s", err)
+		sl.Errorw("TLS handshake did not complete for c2s probe",
+			"module", module,
+			"target", target,
+			"err", err,
+		)
 		return false
 	}
 
@@ -157,6 +175,11 @@ func ProbeC2S(ctx context.Context, target string, config config.Module, _ Client
 		config.C2S.RequireSASLMechanisms,
 	)
 	if !sasl_ok {
+		sl.Debugw("failing probe because of SASL requirements",
+			"module", module,
+			"target", target,
+			"err", err,
+		)
 		probeFailedDueToSASLMechanism.Set(1)
 	}
 
