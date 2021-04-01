@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/semaphore"
+
 	"mellium.im/sasl"
 	"mellium.im/xmlstream"
 	"mellium.im/xmpp"
@@ -96,7 +98,7 @@ type Client struct {
 	HealthCheckTimeout time.Duration
 
 	// runtime state
-	sessionLock sync.Mutex
+	sessionLock *semaphore.Weighted
 	conn        net.Conn
 	session     *xmpp.Session
 	isAlive     bool
@@ -110,6 +112,7 @@ func NewClient(Config *ClientConfig) *Client {
 	result := new(Client)
 	result.Config = Config
 	result.HealthCheckTimeout = 15 * time.Second
+	result.sessionLock = semaphore.NewWeighted(1)
 	return result
 }
 
@@ -121,8 +124,11 @@ func NewClient(Config *ClientConfig) *Client {
 func (c *Client) AcquireSession(ctx context.Context) (*xmpp.Session, error) {
 	sl := zap.S()
 
-	c.sessionLock.Lock()
-	defer c.sessionLock.Unlock()
+	err := c.sessionLock.Acquire(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	defer c.sessionLock.Release(1)
 
 	if c.closed {
 		sl.Debugw("attempt to use closed client session",
@@ -172,20 +178,45 @@ func (c *Client) createSession(ctx context.Context) error {
 // If the healthcheck fails, the connection will be closed and a new session
 // will be established for the next use.
 func (c *Client) Healthcheck() {
+	sl := zap.S()
+
 	c.healthCheckLock.Lock()
 	defer c.healthCheckLock.Unlock()
 	if c.healthCheckRunning {
 		return
 	}
 
-	c.sessionLock.Lock()
-	defer c.sessionLock.Unlock()
+	err := c.sessionLock.Acquire(context.TODO(), 1)
+	if err != nil {
+		sl.Panicw("failed to acquire sessionLock despite being ready to wait for eternity",
+			"client_address", c.Config.ClientAddress.String(),
+			"err", err,
+		)
+	}
+	defer c.sessionLock.Release(1)
 	if !c.isAlive {
 		return
 	}
 
 	c.healthCheckRunning = true
 	go c.healthcheck()
+}
+
+func (c *Client) getSessionRef() *xmpp.Session {
+	sl := zap.S()
+	err := c.sessionLock.Acquire(context.TODO(), 1)
+	if err != nil {
+		sl.Warnw("failed to get lock to obtain session",
+			"client_address", c.Config.ClientAddress.String(),
+			"err", err,
+		)
+		return nil
+	}
+	defer c.sessionLock.Release(1)
+	if !c.isAlive {
+		return nil
+	}
+	return c.session
 }
 
 func (c *Client) healthcheck() {
@@ -202,14 +233,7 @@ func (c *Client) healthcheck() {
 		Type: stanza.GetIQ,
 	}
 
-	session := func() *xmpp.Session {
-		c.sessionLock.Lock()
-		defer c.sessionLock.Unlock()
-		if !c.isAlive {
-			return nil
-		}
-		return c.session
-	}()
+	session := c.getSessionRef()
 	if session == nil {
 		sl.Warnw("client health check failed",
 			"client_address", c.Config.ClientAddress.String(),
@@ -237,9 +261,20 @@ func (c *Client) healthcheck() {
 			"client_address", c.Config.ClientAddress.String(),
 			"err", err,
 		)
-		c.sessionLock.Lock()
-		defer c.sessionLock.Unlock()
-		c.abort()
+		// Do NOT reuse the context from above; if the health check fails, we
+		// have to eventually kill the session.
+		err = c.sessionLock.Acquire(context.TODO(), 1)
+		if err != nil {
+			sl.Warnw("failed to clean up session after failed health check",
+				"client_address", c.Config.ClientAddress.String(),
+				"err", err,
+			)
+			return
+		}
+		defer c.sessionLock.Release(1)
+		if c.session == session {
+			c.abort()
+		}
 		return
 	}
 
@@ -255,13 +290,21 @@ func (c *Client) healthcheck() {
 }
 
 func (c *Client) runSession() {
-	err := c.session.Serve(nil)
-	zap.S().Infow("client session closed",
+	sl := zap.S()
+	err := c.getSessionRef().Serve(nil)
+	sl.Infow("client session closed",
 		"client_address", c.Config.ClientAddress.String(),
 		"err", err,
 	)
-	c.sessionLock.Lock()
-	defer c.sessionLock.Unlock()
+	err = c.sessionLock.Acquire(context.TODO(), 1)
+	if err != nil {
+		sl.Warnw("failed to acquire session lock for termination",
+			"client_address", c.Config.ClientAddress.String(),
+			"err", err,
+		)
+		return
+	}
+	defer c.sessionLock.Release(1)
 	// instakill after error
 	c.abort()
 }
@@ -278,8 +321,8 @@ func (c *Client) abort() {
 }
 
 func (c *Client) Close() {
-	c.sessionLock.Lock()
-	defer c.sessionLock.Unlock()
+	c.sessionLock.Acquire(context.TODO(), 1)
+	defer c.sessionLock.Release(1)
 	c.abort()
 	c.closed = true
 }
