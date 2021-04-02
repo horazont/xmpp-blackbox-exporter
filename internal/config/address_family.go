@@ -41,3 +41,14 @@ func (af AddressFamily) MatchesNetwork(network string) bool {
 		return true
 	}
 }
+
+func (af AddressFamily) Network(protocol string) string {
+	switch af {
+	case ADDRESS_FAMILY_IPV4:
+		return protocol + "4"
+	case ADDRESS_FAMILY_IPV6:
+		return protocol + "6"
+	default:
+		return protocol
+	}
+}

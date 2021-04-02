@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	pconfig "github.com/prometheus/common/config"
 
-	"mellium.im/xmpp/dial"
 	"mellium.im/xmpp/jid"
 
 	"github.com/horazont/xmpp-blackbox-exporter/internal/config"
@@ -30,29 +29,137 @@ type connTrace struct {
 	authDone     time.Time
 }
 
-func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool, restrictAddressFamily config.AddressFamily) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+func isNotFound(err error) bool {
+	dnsErr, ok := err.(*net.DNSError)
+	return ok && dnsErr.IsNotFound
+}
 
-	controlFunc := func(network, address string, c syscall.RawConn) error {
-		if restrictAddressFamily.MatchesNetwork(network) {
-			return nil
+func generateFallbackRecords(service string, domainpart string) []*net.SRV {
+	switch service {
+	case "xmpp-client":
+		return []*net.SRV{&net.SRV{
+			Target: domainpart,
+			Port:   5222,
+		}}
+	case "xmpp-server":
+		return []*net.SRV{&net.SRV{
+			Target: domainpart,
+			Port:   5269,
+		}}
+	}
+	return nil
+}
+
+func lookupXMPPService(ctx context.Context, resolver *net.Resolver, service string, addr jid.JID) (addrs []*net.SRV, err error) {
+	_, addrs, err = resolver.LookupSRV(ctx, service, "tcp", addr.Domainpart())
+	if err != nil {
+		if !isNotFound(err) {
+			return nil, err
 		}
-		return ErrNotThisNetwork
+
+		return generateFallbackRecords(service, addr.Domainpart()), nil
 	}
 
+	if len(addrs) == 1 && addrs[0].Target == "." {
+		return nil, nil
+	}
+	return addrs, nil
+}
+
+type StartTLSConfigurableDialer struct {
+	net.Dialer
+	DirectTLS bool
+	TLSConfig *tls.Config
+}
+
+func (d *StartTLSConfigurableDialer) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+	if d.DirectTLS {
+		return tls.DialWithDialer(
+			&d.Dialer,
+			network,
+			address,
+			d.TLSConfig,
+		)
+	} else {
+		return d.Dialer.DialContext(
+			ctx,
+			network,
+			address,
+		)
+	}
+}
+
+type XMPPDialer struct {
+	StartTLSConfigurableDialer
+	S2S bool
+}
+
+func (d *XMPPDialer) Dial(ctx context.Context, network string, addr jid.JID) (net.Conn, error) {
+	var service string
+	if d.DirectTLS {
+		if d.S2S {
+			service = "xmpps-server"
+		} else {
+			service = "xmpps-client"
+		}
+	} else {
+		if d.S2S {
+			service = "xmpp-server"
+		} else {
+			service = "xmpp-client"
+		}
+	}
+
+	addrs, err := lookupXMPPService(ctx, d.Resolver, service, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no %s service found at address %s", service, addr.Domain())
+	}
+
+	for _, srvRecord := range addrs {
+		var conn net.Conn
+		var addrError error
+		netAddress := net.JoinHostPort(
+			srvRecord.Target,
+			strconv.FormatUint(uint64(srvRecord.Port), 10),
+		)
+		conn, addrError = d.StartTLSConfigurableDialer.Dial(
+			ctx,
+			network,
+			netAddress,
+		)
+		if addrError != nil {
+			err = addrError
+			continue
+		}
+
+		return conn, nil
+	}
+
+	return nil, err
+}
+
+func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool, restrictAddressFamily config.AddressFamily) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
 	if host == "" {
-		dialer := dial.Dialer{
-			NoTLS:     !directTLS,
-			S2S:       s2s,
+		dialer := XMPPDialer{
+			StartTLSConfigurableDialer: StartTLSConfigurableDialer{
+				DirectTLS: directTLS,
+				TLSConfig: tls_config,
+			},
+			S2S: s2s,
+		}
+		dialer.Deadline, _ = ctx.Deadline()
+		conn, err = dialer.Dial(ctx, restrictAddressFamily.Network("tcp"), to)
+	} else {
+		dialer := StartTLSConfigurableDialer{
+			DirectTLS: directTLS,
 			TLSConfig: tls_config,
 		}
-		dialer.Control = controlFunc
 		dialer.Deadline, _ = ctx.Deadline()
-		conn, err = dialer.Dial(ctx, "tcp", to)
-	} else {
-		dialer := net.Dialer{}
-		dialer.Control = controlFunc
-		dialer.Deadline, _ = ctx.Deadline()
-		conn, err = dialer.Dial("tcp", host)
+		conn, err = dialer.Dial(ctx, restrictAddressFamily.Network("tcp"), host)
 	}
 
 	if err != nil {
