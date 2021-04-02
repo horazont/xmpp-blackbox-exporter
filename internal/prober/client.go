@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/xml"
 	"errors"
+	"go.uber.org/zap"
 	"net"
 	"sync"
 	"time"
-	"go.uber.org/zap"
 
 	"mellium.im/sasl"
 	"mellium.im/xmlstream"

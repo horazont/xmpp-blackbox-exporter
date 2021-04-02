@@ -3,9 +3,9 @@ package prober
 import (
 	"context"
 	"encoding/xml"
+	"go.uber.org/zap"
 	"net"
 	"time"
-	"go.uber.org/zap"
 
 	"mellium.im/xmlstream"
 	"mellium.im/xmpp"

@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 	"time"
-	"go.uber.org/zap"
 
 	"mellium.im/xmpp"
 	"mellium.im/xmpp/jid"

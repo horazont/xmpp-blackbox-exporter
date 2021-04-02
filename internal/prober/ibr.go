@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/xml"
+	"go.uber.org/zap"
 	"net"
 	"time"
-	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,8 +13,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"mellium.im/xmpp/jid"
 
