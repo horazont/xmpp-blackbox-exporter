@@ -34,9 +34,7 @@ modules:
     timeout: 30s
     prober: ping
     ping:
-      client_address: blackbox@domain.example
-      client_password: sup3rs3cur3p4ssw0rd
-      directtls: false
+      account: pingaccount
       # treat as success if either a proper ping response is seen or a
       # `remote-server-not-found` error condition is returned.
       # rarely a good combination, this is just for illustration purposes :)
@@ -50,3 +48,8 @@ modules:
      prefix: "blackbox-probe-"
      directtls: false
      export_error_info: true
+accounts:
+  pingaccount:
+    client_address: blackbox@domain.example
+    client_password: sup3rs3cur3p4ssw0rd
+    directtls: false
