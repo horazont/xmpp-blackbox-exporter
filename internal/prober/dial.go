@@ -143,24 +143,35 @@ func (d *XMPPDialer) Dial(ctx context.Context, network string, addr jid.JID) (ne
 }
 
 func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host string, to jid.JID, s2s bool, restrictAddressFamily config.AddressFamily) (tls_state *tls.ConnectionState, conn net.Conn, err error) {
+	ctxDeadline, _ := ctx.Deadline()
+
 	if host == "" {
 		dialer := XMPPDialer{
 			StartTLSConfigurableDialer: StartTLSConfigurableDialer{
+				Dialer: net.Dialer{
+					Deadline: ctxDeadline,
+				},
 				DirectTLS: directTLS,
 				TLSConfig: tls_config,
 			},
 			S2S: s2s,
 		}
-		dialer.Deadline, _ = ctx.Deadline()
 		conn, err = dialer.Dial(ctx, restrictAddressFamily.Network("tcp"), to)
 	} else {
 		dialer := StartTLSConfigurableDialer{
+			Dialer: net.Dialer{
+				Deadline: ctxDeadline,
+			},
 			DirectTLS: directTLS,
 			TLSConfig: tls_config,
 		}
-		dialer.Deadline, _ = ctx.Deadline()
 		conn, err = dialer.Dial(ctx, restrictAddressFamily.Network("tcp"), host)
 	}
+
+	// Set the deadline correctly for all connections we use. This is correct
+	// for both single-use connections (c2s, s2s, ibr) as well as shared
+	// connections (ping; as we reset it there later).
+	conn.SetDeadline(ctxDeadline)
 
 	if err != nil {
 		return

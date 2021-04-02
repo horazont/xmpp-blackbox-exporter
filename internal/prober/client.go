@@ -43,10 +43,6 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 		)
 		return ct, nil, nil, err
 	}
-	ctxDeadline, ok := ctx.Deadline()
-	if ok {
-		conn.SetDeadline(ctxDeadline)
-	}
 
 	ct.connectDone = time.Now()
 
