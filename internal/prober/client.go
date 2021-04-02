@@ -43,6 +43,9 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 		)
 		return ct, nil, nil, err
 	}
+	// Finally, clear the deadline again; we don’t want to step on prober’s
+	// toes.
+	defer conn.SetDeadline(time.Unix(0, 0))
 
 	ct.connectDone = time.Now()
 
@@ -85,10 +88,6 @@ func (cfg *ClientConfig) Login(ctx context.Context) (ct connTrace, conn net.Conn
 	if !ct.starttls {
 		ct.starttlsDone = ct.connectDone
 	}
-
-	// Finally, clear the deadline again; we don’t want to step on prober’s
-	// toes.
-	conn.SetDeadline(time.Unix(0, 0))
 
 	return ct, conn, session, err
 }
