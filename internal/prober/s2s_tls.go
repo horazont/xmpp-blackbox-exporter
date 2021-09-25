@@ -63,9 +63,14 @@ func executeProbeS2S(ctx context.Context, conn net.Conn, from jid.JID, to jid.JI
 func ProbeS2S(ctx context.Context, module, target string, config config.Module, _ Clients, registry *prometheus.Registry) bool {
 	sl := zap.S()
 
-	probeSSLEarliestCertExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
+	probeSSLLastChainExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "probe_ssl_earliest_cert_expiry",
-		Help: "Returns earliest SSL cert expiry date",
+		Help: "Returns the date when the last valid chain expires",
+	})
+
+	probeSSLNextChainExpiry := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "probe_ssl_next_chain_expiry",
+		Help: "Returns the date when the next valid chain expires",
 	})
 
 	probeFailedDueToSASLMechanism := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -178,8 +183,12 @@ func ProbeS2S(ctx context.Context, module, target string, config config.Module, 
 
 	_ = stream_info
 
-	registry.MustRegister(probeSSLEarliestCertExpiry)
-	probeSSLEarliestCertExpiry.Set(float64(getEarliestCertExpiry(tls_state.VerifiedChains).Unix()))
+	registry.MustRegister(probeSSLNextChainExpiry)
+	registry.MustRegister(probeSSLLastChainExpiry)
+
+	next_chain, last_chain := getChainExpiries(tls_state.VerifiedChains)
+	probeSSLNextChainExpiry.Set(float64(next_chain.Unix()))
+	probeSSLLastChainExpiry.Set(float64(last_chain.Unix()))
 
 	if config.S2S.ExportAuthMechanisms {
 		registry.MustRegister(probeSASLMechanisms)
