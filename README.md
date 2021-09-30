@@ -54,7 +54,7 @@ $ ./xmpp_blackbox_exporter -config.file example.yml
 ### Running using Docker
 
 ```
-$ docker run --rm -p 9604:9604 horazont/prometheus-xmpp-blackbox-exporter:latest
+$ docker run --rm -p 9604:9604 xsfjonas/prometheus-xmpp-blackbox-exporter:latest
 ```
 
 ### Example Probe
