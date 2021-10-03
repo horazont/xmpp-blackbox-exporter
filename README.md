@@ -1,6 +1,6 @@
 # XMPP Blackbox Exporter
 
-[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/xsfjonas/prometheus-xmpp-blackbox-exporter.svg)](https://hub.docker.com/r/xsfjonas/prometheus-xmpp-blackbox-exporter)
+[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/xsfjonas/xmpp-blackbox-exporter.svg)](https://hub.docker.com/r/xsfjonas/xmpp-blackbox-exporter)
 
 This project is a [Prometheus exporter](https://prometheus.io/docs/instrumenting/exporters/)
 which allows to probe XMPP services and export metrics from the probes to
@@ -47,14 +47,14 @@ See also the [example configuration](example.yml).
 
 ```
 $ export GO111MODULE=on
-$ go build cmd/prometheus-xmpp-blackbox-exporter/xmpp_blackbox_exporter.go
+$ go build cmd/xmpp_blackbox_exporter/xmpp_blackbox_exporter.go
 $ ./xmpp_blackbox_exporter -config.file example.yml
 ```
 
 ### Running using Docker
 
 ```
-$ docker run --rm -p 9604:9604 xsfjonas/prometheus-xmpp-blackbox-exporter:latest
+$ docker run --rm -p 9604:9604 xsfjonas/xmpp-blackbox-exporter:latest
 ```
 
 ### Example Probe
