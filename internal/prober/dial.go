@@ -168,14 +168,14 @@ func dialXMPP(ctx context.Context, directTLS bool, tls_config *tls.Config, host 
 		conn, err = dialer.Dial(ctx, restrictAddressFamily.Network("tcp"), host)
 	}
 
+	if err != nil {
+		return
+	}
+
 	// Set the deadline correctly for all connections we use. This is correct
 	// for both single-use connections (c2s, s2s, ibr) as well as shared
 	// connections (ping; as we reset it there later).
 	conn.SetDeadline(ctxDeadline)
-
-	if err != nil {
-		return
-	}
 
 	if directTLS {
 		tls_state = &tls.ConnectionState{}
